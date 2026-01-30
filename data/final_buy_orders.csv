@@ -1,0 +1,9 @@
+Type,Ticker,Reason,Shares,Price,Total_Cost
+CORE (ETF),XLK,Sector Trend (16.7%),13,145.09,1886.17
+CORE (ETF),XLF,Sector Trend (21.7%),37,53.07,1963.59
+CORE (ETF),XLV,Sector Trend (19.2%),12,157.48,1889.76
+SATELLITE (Stock),HUM,Value Gap (+1557.1),3,266.5,799.5
+SATELLITE (Stock),F,Value Gap (+1183.6),58,13.56,786.48
+SATELLITE (Stock),MCK,Value Gap (+1174.6),0,820.23,0.0
+SATELLITE (Stock),GM,Value Gap (+854.5),10,79.68,796.8
+SATELLITE (Stock),PRU,Value Gap (+556.5),7,107.69,753.83
