@@ -41,8 +41,20 @@ def run_logic_script(script_name):
         st.error(f"Script not found: {script_path}")
         return False
         
+    # --- THE FIX: INJECT ROOT PATH ---
+    # We add the current directory (project root) to PYTHONPATH
+    # This allows scripts in 'logic/' to say "from logic.db_config import..."
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.getcwd()
+    
     with st.spinner(f"Executing {script_name}..."):
-        result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, script_path], 
+            capture_output=True, 
+            text=True,
+            env=env  # <--- PASS THE ENVIRONMENT WITH PYTHONPATH
+        )
+        
         if result.returncode == 0:
             st.success(f"SUCCESS: {script_name}")
             with st.expander("View Logs"):
@@ -50,7 +62,7 @@ def run_logic_script(script_name):
             return True
         else:
             st.error(f"FAILED: {script_name}")
-            st.error(result.stderr)
+            st.error(result.stderr) # Show the actual error
             return False
 
 def load_csv(filename):
