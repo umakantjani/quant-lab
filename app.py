@@ -77,7 +77,7 @@ def load_from_postgres(query):
         return pd.DataFrame()
 
 # --- SIDEBAR NAVIGATION ---
-st.sidebar.title("[ SYSTEM CONTROL ]")
+st.sidebar.title("[ MISSION CONTROL ]")
 mode = st.sidebar.radio("MODE", [
     "1. ALPHA PIPELINE (Daily)", 
     "2. QUANT LAB (Research)", 
@@ -149,7 +149,7 @@ if mode == "1. ALPHA PIPELINE (Daily)":
 # ==============================================================================
 elif mode == "2. QUANT LAB (Research)":
     st.title("QUANTITATIVE RESEARCH LAB")
-    st.info("Powered by Postgres Database (stock_master)")
+    st.info("Designed with Consious Models")
     
     # --- NEW: SYSTEM INITIALIZATION (For Cloud Setup) ---
     with st.expander("🛠 SYSTEM SETUP (RUN ONCE FOR NEW DB)", expanded=False):
