@@ -126,24 +126,23 @@ if mode == "1. ALPHA PIPELINE (Daily)":
     tab1, tab2, tab3, tab4 = st.tabs(["VALUATION REPORT", "TECHNICALS", "ETF STRATEGY", "BUY ORDERS"])
     
     with tab1:
-        df = load_csv("my_deep_value_portfolio.csv")
-        if df is not None: st.dataframe(df, use_container_width=True)
-        else: st.warning("No Data. Run Step 2.")
+        # READ FROM DB NOW
+        df = load_from_postgres("SELECT * FROM alpha_valuation")
+        if not df.empty: 
+            st.dataframe(df, use_container_width=True)
+        else: 
+            st.warning("No Data. Run Step 1 & 2.")
         
     with tab2:
-        df = load_csv("technical_analysis_report.csv")
-        if df is not None: st.dataframe(df, use_container_width=True)
-        else: st.warning("No Data. Run Step 3.")
+        # You can migrate technicals.py later, for now we leave as placeholder
+        st.info("Technical Analysis pipeline pending DB migration.")
         
     with tab3:
-        df = load_csv("my_etf_strategy.csv")
-        if df is not None: st.dataframe(df, use_container_width=True)
-        else: st.warning("No Data. Run Step 4.")
+        st.info("ETF Strategy pipeline pending DB migration.")
 
     with tab4:
-        df = load_csv("final_buy_orders.csv")
-        if df is not None: st.dataframe(df, use_container_width=True)
-        else: st.warning("No Data. Run Step 5.")
+        # Orders would read from 'alpha_orders' table eventually
+        st.info("Order generation pending DB migration.")
 
 # ==============================================================================
 # MODE 2: QUANT LAB (The New Database Engine)
