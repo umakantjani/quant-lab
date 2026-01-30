@@ -152,6 +152,17 @@ elif mode == "2. QUANT LAB (Research)":
     st.title("QUANTITATIVE RESEARCH LAB")
     st.info("Powered by Postgres Database (stock_master)")
     
+    # --- NEW: SYSTEM INITIALIZATION (For Cloud Setup) ---
+    with st.expander("🛠 SYSTEM SETUP (RUN ONCE FOR NEW DB)", expanded=False):
+        st.warning("Only run these if your cloud database is empty!")
+        c_setup1, c_setup2 = st.columns(2)
+        with c_setup1:
+            if st.button("1. RESET DATABASE TABLES"):
+                run_logic_script("setup_db.py")
+        with c_setup2:
+            if st.button("2. INGEST MARKET TICKERS"):
+                run_logic_script("ingest_tickers.py")
+
     # CONTROL PANEL
     c1, c2 = st.columns(2)
     with c1:
@@ -170,6 +181,8 @@ elif mode == "2. QUANT LAB (Research)":
     
     # THREE TABS
     tab1, tab2, tab3 = st.tabs(["RANKINGS (FUNDAMENTAL)", "SIGNALS (TECHNICAL)", "INSPECTOR (CHARTS)"])
+    
+    # ... (Keep the rest of the tab logic exactly as it was) ...
     
     # --- TAB 1: FUNDAMENTAL RANKINGS ---
     with tab1:
