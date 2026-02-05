@@ -283,38 +283,42 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
     with t2:
         render_guide("technicals")
         
-        # Load Data (Sorted by Score)
+        # TOGGLE: Show specific signals vs. everything
+        filter_mode = st.radio("Show:", ["Active Signals Only (Buy/Watch)", "Full Checklist (All Stocks)"], horizontal=True)
+        
+        # Load Data
         df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"Score\" DESC")
         
         if not df_tech.empty:
-            st.markdown("### 🎯 Sniper Checklist (The Trinity)")
+            # Apply Filter
+            if filter_mode == "Active Signals Only (Buy/Watch)":
+                df_display_source = df_tech[df_tech['Signal'] != 'WAIT']
+            else:
+                df_display_source = df_tech
+
+            st.markdown(f"### 🎯 Sniper Checklist ({len(df_display_source)} Tickers)")
             
             # --- BUILD TABLE ---
             df_display = pd.DataFrame()
-            df_display['Ticker'] = df_tech['ticker']
-            df_display['Price'] = df_tech['price'].apply(lambda x: f"${x:.2f}")
-            df_display['Score'] = df_tech['Score']
-            df_display['Signal'] = df_tech['Signal']
+            df_display['Ticker'] = df_display_source['ticker']
+            df_display['Price'] = df_display_source['price'].apply(lambda x: f"${x:.2f}")
+            df_display['Score'] = df_display_source['Score']
+            df_display['Signal'] = df_display_source['Signal']
             
-            # 1. THE TREND (With 200 SMA Value)
-            # Logic: If price > sma, BULL. Show the SMA level in parens.
-            df_display['🌊 Trend'] = df_tech.apply(
+            # 1. THE TREND
+            df_display['🌊 Trend'] = df_display_source.apply(
                 lambda x: f"✅ BULL (${x['trend_200_sma']:.2f})" if x['trend_pass'] 
-                else f"❌ BEAR (${x['trend_200_sma']:.2f})", 
-                axis=1
+                else f"❌ BEAR (${x['trend_200_sma']:.2f})", axis=1
             )
             
-            # 2. THE ZONE (With RSI Value)
-            # Logic: If RSI < 35, CHEAP. Show RSI value.
-            df_display['📉 Zone'] = df_tech.apply(
+            # 2. THE ZONE
+            df_display['📉 Zone'] = df_display_source.apply(
                 lambda x: f"✅ LOW ({x['rsi']})" if x['rsi'] < 35 
-                else f"⚠️ ({x['rsi']})", 
-                axis=1
+                else f"⚠️ ({x['rsi']})", axis=1
             )
             
-            # 3. THE TRIGGER (With Pattern Name)
-            # Logic: If not 'None', show the pattern name.
-            df_display['🕯️ Trigger'] = df_tech['trigger_type'].apply(
+            # 3. THE TRIGGER
+            df_display['🕯️ Trigger'] = df_display_source['trigger_type'].apply(
                 lambda x: f"✅ {x}" if x != "None" else "❌ Wait"
             )
             
@@ -322,12 +326,13 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
             st.dataframe(
                 df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn", vmin=0, vmax=100)
                 .map(lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG' in str(x) else 
-                             ('color: #FFA500' if 'RISKY' in str(x) else ''), subset=['Signal']),
+                             ('color: #FFA500' if 'RISKY' in str(x) else 
+                             ('color: #FFFF00' if 'WATCH' in str(x) else '')), subset=['Signal']),
                 use_container_width=True,
                 height=600
             )
         else:
-            st.info("No active signals found.")
+            st.info("No data. Run 'RUN TECHNICAL SNIPER'.")
 
 # ==============================================================================
 # MODE 3: SYSTEM ADMIN

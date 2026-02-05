@@ -8,13 +8,14 @@ import time
 engine = get_engine()
 
 def run_technical_sniper():
-    print("🎯 RUNNING TECHNICAL SNIPER (SCORING + TRINITY)...")
+    print("🎯 RUNNING TECHNICAL SNIPER (FULL MARKET CHECKLIST)...")
     
-    # 1. Get Tickers (Top 100 Liquid or All)
+    # 1. Get Tickers (Increase limit to see more stocks)
     try:
+        # We fetch 100 tickers. Change LIMIT 500 if you want a wider net.
         tickers = pd.read_sql("SELECT symbol FROM tickers LIMIT 100", engine)['symbol'].tolist()
     except:
-        tickers = ["AAPL", "NVDA", "TSLA", "AMD", "AMZN", "GOOGL", "MSFT", "EPAM"]
+        tickers = ["AAPL", "NVDA", "TSLA", "AMD", "AMZN", "GOOGL", "MSFT", "EPAM", "SPY", "QQQ", "IWM"]
     
     results = []
     print(f"   > Scanning {len(tickers)} stocks...")
@@ -32,7 +33,6 @@ def run_technical_sniper():
             trend_pass = price > sma_200
             
             # --- 2. THE ZONE (30 Pts) ---
-            # Manual RSI 14
             delta = df['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -58,38 +58,35 @@ def run_technical_sniper():
             trigger_type = "Hammer" if is_hammer else ("Engulfing" if is_engulfing else "None")
             trigger_pass = is_hammer or is_engulfing
 
-            # --- SCORING ENGINE ---
+            # --- SCORING ---
             score = 0
             if trend_pass: score += 40
             if zone_pass: score += 30
             if trigger_pass: score += 30
-            
-            # Bonus: Extreme Oversold (RSI < 25)
-            if rsi < 25: score += 10
-            
-            # Cap at 100
+            if rsi < 25: score += 10 # Bonus
             score = min(100, score)
 
-            # --- SIGNAL LOGIC ---
+            # --- SIGNAL ---
             signal = "WAIT"
             if score >= 90: signal = "STRONG BUY"
-            elif score >= 60 and trigger_pass: signal = "RISKY BUY" # Counter-trend
+            elif score >= 60 and trigger_pass: signal = "RISKY BUY" 
             elif zone_pass: signal = "WATCH"
             
-            if signal != "WAIT":
-                results.append({
-                    "ticker": t,
-                    "price": price,
-                    "trend_200_sma": round(sma_200, 2),
-                    "trend_pass": trend_pass,
-                    "rsi": round(rsi, 1),
-                    "zone_pass": zone_pass,
-                    "trigger_type": trigger_type,
-                    "trigger_pass": trigger_pass,
-                    "Score": score, # <--- SAVED
-                    "Signal": signal
-                })
-                print(f"   > {t}: {signal} (Score: {score})")
+            # --- SAVE EVERYTHING (The Fix) ---
+            # We removed the 'if signal != "WAIT"' filter
+            results.append({
+                "ticker": t,
+                "price": price,
+                "trend_200_sma": round(sma_200, 2),
+                "trend_pass": trend_pass,
+                "rsi": round(rsi, 1),
+                "zone_pass": zone_pass,
+                "trigger_type": trigger_type,
+                "trigger_pass": trigger_pass,
+                "Score": score,
+                "Signal": signal
+            })
+            print(f"   > {t}: {signal} (Score: {score})")
                 
         except Exception as e:
             continue
@@ -97,9 +94,9 @@ def run_technical_sniper():
     if results:
         df_res = pd.DataFrame(results)
         df_res.to_sql('technical_signals', engine, if_exists='replace', index=False)
-        print(f"✅ FOUND {len(df_res)} SIGNALS.")
+        print(f"✅ CHECKLIST UPDATED. Saved {len(df_res)} stocks.")
     else:
-        print("No signals found.")
+        print("No data found.")
 
 if __name__ == "__main__":
     run_technical_sniper()
