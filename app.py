@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import subprocess
 import sys
+import time
 import plotly.graph_objects as go
 from sqlalchemy import text
 from logic.db_config import get_engine
@@ -34,6 +35,11 @@ st.markdown("""
     
     div[data-testid="stExpander"] {
         border: 1px solid #303030; border-radius: 6px; background-color: #0e1117;
+    }
+    
+    /* Status Container Styling */
+    div[data-testid="stStatusWidget"] {
+        border: 1px solid #00FF00; background-color: #051a05;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -110,6 +116,7 @@ def render_guide(topic):
             * **Limit Price:** We strictly use **Limit Orders** at the current price to avoid slippage.
             * **Action:** Download the CSV. It is formatted for direct upload to interactive brokers or for your manual blotter.
             """)
+
 # --- HELPER: SCRIPT RUNNER ---
 def run_logic_script(script_name):
     script_path = os.path.join(LOGIC_DIR, script_name)
@@ -147,7 +154,12 @@ def load_data(query):
 # --- SIDEBAR ---
 st.sidebar.title("QUANT LAB [GOLD]")
 st.sidebar.markdown("---")
-mode = st.sidebar.radio("WORKFLOW", ["1. DAILY ACTION (Alpha)", "2. RESEARCH LAB (Deep Dive)", "3. SYSTEM ADMIN (Cloud)"])
+mode = st.sidebar.radio("WORKFLOW", [
+    "1. DAILY ACTION (Alpha)", 
+    "2. RESEARCH LAB (Deep Dive)", 
+    "3. SYSTEM ADMIN (Cloud)",
+    "4. ASSET LAB REPORT (AI)" # <--- NEW TAB
+])
 
 # ==============================================================================
 # MODE 1: DAILY ALPHA
@@ -178,7 +190,7 @@ if mode == "1. DAILY ACTION (Alpha)":
     tab_val, tab_tech, tab_etf, tab_ord = st.tabs(["💎 VALUATION REPORT", "📈 TECHNICAL SIGNALS", "🛡 ETF STRATEGY", "🛒 BUY ORDERS"])
     
     with tab_val:
-        render_guide("valuation") # <--- INFO ADDED
+        render_guide("valuation") 
         df = load_data("SELECT * FROM alpha_valuation ORDER BY upside_pct DESC")
         if not df.empty:
             st.metric("Undervalued Opportunities", len(df))
@@ -186,57 +198,14 @@ if mode == "1. DAILY ACTION (Alpha)":
         else: st.info("No Valuation Data. Run Steps 1 & 2.")
 
     with tab_tech:
-        render_guide("technicals")
-        
-        # Load the detailed data
-        df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"rsi\" ASC")
-        
+        render_guide("technicals") 
+        df_tech = load_data("SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT' ORDER BY \"Score\" DESC")
         if not df_tech.empty:
-            st.markdown("### 🎯 Sniper Checklist (The Trinity)")
-            
-            # Formatting for the UI
-            def format_trend(pass_fail):
-                return "✅ BULL (>200)" if pass_fail else "❌ BEAR (<200)"
-                
-            def format_zone(rsi_val):
-                return f"✅ CHEAP ({rsi_val})" if rsi_val < 35 else f"⚠️ HIGH ({rsi_val})"
-                
-            def format_trigger(trig_type):
-                return f"✅ {trig_type}" if trig_type != "None" else "❌ Waiting"
-
-            # Create a Display View (Checklist)
-            df_display = pd.DataFrame()
-            df_display['Ticker'] = df_tech['ticker']
-            df_display['Price'] = df_tech['price'].apply(lambda x: f"${x:.2f}")
-            
-            # 1. The Tide
-            df_display['🌊 Trend (200 SMA)'] = df_tech['trend_pass'].apply(format_trend)
-            
-            # 2. The Zone
-            df_display['📉 Zone (RSI)'] = df_tech['rsi'].apply(format_zone)
-            
-            # 3. The Trigger
-            df_display['🕯️ Trigger'] = df_tech['trigger_type'].apply(format_trigger)
-            
-            # 4. Final Call
-            df_display['SIGNAL'] = df_tech['Signal']
-            
-            # Render Styled Table
-            st.dataframe(
-                df_display.style.map(
-                    lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG BUY' in str(x) else 
-                             ('color: #FFA500' if 'RISKY' in str(x) else 
-                             ('color: #FFFF00' if 'WATCH' in str(x) else '')), 
-                    subset=['SIGNAL']
-                ),
-                use_container_width=True,
-                height=600
-            )
-        else:
-            st.info("No active signals found. The market is quiet.")
+             st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True)
+        else: st.info("No Technical Signals. Run Step 3.")
 
     with tab_etf:
-        render_guide("etf") # <--- INFO ADDED
+        render_guide("etf") 
         df_etf = load_data("SELECT * FROM etf_hedges ORDER BY weight DESC")
         if not df_etf.empty:
             c1, c2 = st.columns([2, 1])
@@ -248,7 +217,7 @@ if mode == "1. DAILY ACTION (Alpha)":
         else: st.info("No ETF Data. Run 'RUN ETF MAPPER'.")
 
     with tab_ord:
-        render_guide("orders") # <--- INFO ADDED
+        render_guide("orders") 
         df_ord = load_data("SELECT * FROM alpha_orders")
         if not df_ord.empty:
             st.success(f"Generated {len(df_ord)} Buy Orders.")
@@ -273,7 +242,7 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
 
     st.markdown("---")
 
-    t1, t2, t3 = st.tabs(["🏆 FACTOR RANKINGS", "🎯 SNIPER SIGNALS", "🔎 STOCK INSPECTOR"])
+    t1, t2 = st.tabs(["🏆 FACTOR RANKINGS", "🎯 SNIPER SIGNALS"])
     
     with t1:
         df_rank = load_data("SELECT * FROM quant_rankings ORDER BY \"TOTAL_SCORE\" DESC")
@@ -282,15 +251,10 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
 
     with t2:
         render_guide("technicals")
-        
-        # TOGGLE: Show specific signals vs. everything
         filter_mode = st.radio("Show:", ["Active Signals Only (Buy/Watch)", "Full Checklist (All Stocks)"], horizontal=True)
-        
-        # Load Data
         df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"Score\" DESC")
         
         if not df_tech.empty:
-            # Apply Filter
             if filter_mode == "Active Signals Only (Buy/Watch)":
                 df_display_source = df_tech[df_tech['Signal'] != 'WAIT']
             else:
@@ -298,85 +262,18 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
 
             st.markdown(f"### 🎯 Sniper Checklist ({len(df_display_source)} Tickers)")
             
-            # --- BUILD TABLE ---
             df_display = pd.DataFrame()
             df_display['Ticker'] = df_display_source['ticker']
             df_display['Price'] = df_display_source['price'].apply(lambda x: f"${x:.2f}")
             df_display['Score'] = df_display_source['Score']
             df_display['Signal'] = df_display_source['Signal']
             
-            # 1. THE TREND
-            df_display['🌊 Trend'] = df_display_source.apply(
-                lambda x: f"✅ BULL (${x['trend_200_sma']:.2f})" if x['trend_pass'] 
-                else f"❌ BEAR (${x['trend_200_sma']:.2f})", axis=1
-            )
+            df_display['🌊 Trend'] = df_display_source.apply(lambda x: f"✅ BULL (${x['trend_200_sma']:.2f})" if x['trend_pass'] else f"❌ BEAR (${x['trend_200_sma']:.2f})", axis=1)
+            df_display['📉 Zone'] = df_display_source.apply(lambda x: f"✅ LOW ({x['rsi']})" if x['rsi'] < 35 else f"⚠️ ({x['rsi']})", axis=1)
+            df_display['🕯️ Trigger'] = df_display_source['trigger_type'].apply(lambda x: f"✅ {x}" if x != "None" else "❌ Wait")
             
-            # 2. THE ZONE
-            df_display['📉 Zone'] = df_display_source.apply(
-                lambda x: f"✅ LOW ({x['rsi']})" if x['rsi'] < 35 
-                else f"⚠️ ({x['rsi']})", axis=1
-            )
-            
-            # 3. THE TRIGGER
-            df_display['🕯️ Trigger'] = df_display_source['trigger_type'].apply(
-                lambda x: f"✅ {x}" if x != "None" else "❌ Wait"
-            )
-            
-            # --- RENDER ---
-            st.dataframe(
-                df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn", vmin=0, vmax=100)
-                .map(lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG' in str(x) else 
-                             ('color: #FFA500' if 'RISKY' in str(x) else 
-                             ('color: #FFFF00' if 'WATCH' in str(x) else '')), subset=['Signal']),
-                use_container_width=True,
-                height=600
-            )
-        else:
-            st.info("No data. Run 'RUN TECHNICAL SNIPER'.")
-    with t3:
-        # Import the new AI Engine locally to avoid top-level crashes if file is missing
-        try:
-            from logic.report_engine import generate_ai_report
-        except ImportError:
-            st.error("Report Engine not found. Please create 'logic/report_engine.py'.")
-
-        st.markdown("### 🧬 MOLECULAR INSPECTOR (Gemini AI)")
-        
-        # 1. SELECTION CONTROLS
-        c_sel1, c_sel2 = st.columns([1, 3])
-        with c_sel1:
-            # Load tickers but allow custom entry
-            db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist() if not load_data("SELECT DISTINCT ticker FROM prices").empty else ["AAPL", "MSFT", "TSLA"]
-            ticker_input = st.selectbox("Select Ticker", db_tickers)
-        
-        with c_sel2:
-            st.write("") # Spacer
-            st.write("") 
-            # THE "MAGIC" BUTTON
-            if st.button(f"✨ ASK GEMINI: ANALYZE {ticker_input}"):
-                with st.spinner(f"Connecting to Neural Core... Analyzing {ticker_input}..."):
-                    report = generate_ai_report(ticker_input)
-                    
-                    # 2. RENDER REPORT
-                    st.markdown("---")
-                    st.markdown(report)
-                    
-                    # 3. SHOW CHART (Context)
-                    df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{ticker_input}' ORDER BY date")
-                    if not df_p.empty:
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Price', line=dict(color='#00FF00', width=2)))
-                        # Add simple annotations or style
-                        fig.update_layout(
-                            title=f"{ticker_input} Price Action",
-                            template="plotly_dark", 
-                            height=300, 
-                            margin=dict(l=0, r=0, t=30, b=0),
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            paper_bgcolor='rgba(0,0,0,0)'
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-        
+            st.dataframe(df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn", vmin=0, vmax=100).map(lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG' in str(x) else ('color: #FFA500' if 'RISKY' in str(x) else ('color: #FFFF00' if 'WATCH' in str(x) else '')), subset=['Signal']), use_container_width=True, height=600)
+        else: st.info("No data. Run 'RUN TECHNICAL SNIPER'.")
 
 # ==============================================================================
 # MODE 3: SYSTEM ADMIN
@@ -397,3 +294,70 @@ elif mode == "3. SYSTEM ADMIN (Cloud)":
             
     with st.expander("DIAGNOSTICS"):
         if st.button("RUN SYSTEM HEALTH CHECK"): run_logic_script("diagnose.py")
+
+# ==============================================================================
+# MODE 4: ASSET LAB REPORT (AI) - NEW SECTION
+# ==============================================================================
+elif mode == "4. ASSET LAB REPORT (AI)":
+    st.title("🧬 ASSET LAB REPORT")
+    st.markdown("Automated Institutional Research powered by **Gemini AI**.")
+    st.markdown("---")
+
+    # Import locally
+    try: from logic.report_engine import generate_ai_report
+    except ImportError: st.error("Report Engine missing.")
+
+    c1, c2 = st.columns([1, 2])
+    
+    with c1:
+        st.subheader("Select Asset")
+        # Load tickers
+        db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist() if not load_data("SELECT DISTINCT ticker FROM prices").empty else ["AAPL", "MSFT", "TSLA"]
+        ticker_input = st.selectbox("Ticker Symbol", db_tickers)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        generate_btn = st.button(f"✨ GENERATE REPORT FOR {ticker_input}", use_container_width=True)
+        
+    with c2:
+        if generate_btn:
+            # --- THE FEEDBACK ANIMATION ---
+            with st.status(f"🚀 Initializing Neural Analyst for {ticker_input}...", expanded=True) as status:
+                
+                st.write("📡 Connecting to Market Data Stream (Price & History)...")
+                time.sleep(1.0) # UX Pacing
+                
+                st.write("📐 Calculating Technical Trinity (Trend, Zone, Trigger)...")
+                time.sleep(0.8)
+                
+                st.write("💵 Fetching Deep Value Models (Damodaran DCF)...")
+                time.sleep(0.8)
+                
+                st.write("🧠 Synthesizing Narrative with Gemini AI...")
+                # The Actual Call
+                report = generate_ai_report(ticker_input)
+                
+                status.update(label="✅ Report Generated Successfully", state="complete", expanded=False)
+            
+            # SHOW REPORT
+            st.markdown(report)
+            
+            # CONTEXT CHART
+            df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{ticker_input}' ORDER BY date")
+            if not df_p.empty:
+                st.markdown("---")
+                st.markdown(f"**{ticker_input} Price Action (1 Year)**")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Price', line=dict(color='#00FF00', width=2)))
+                fig.update_layout(template="plotly_dark", height=300, margin=dict(l=0, r=0, t=30, b=0), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            # Placeholder State
+            st.info("👈 Select a ticker and click 'Generate Report' to begin analysis.")
+            st.markdown("""
+            **What this engine does:**
+            1.  **Trend Analysis:** Checks the 200-Day SMA.
+            2.  **Momentum Check:** Analyzes RSI & Bollinger Bands.
+            3.  **Pattern Recognition:** Hunts for Hammers & Engulfing Candles.
+            4.  **Valuation Overlay:** Checks against our DCF database.
+            5.  **AI Synthesis:** Writes a Wall Street-style executive summary.
+            """)
