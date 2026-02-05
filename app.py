@@ -157,14 +157,14 @@ if mode == "1. DAILY ACTION (Alpha)":
         if st.button("RUN TECHNICALS"): run_logic_script("technical_models.py")
     with c4:
         st.subheader("4. HEDGE")
-        if st.button("RUN ETF MAPPER"): st.info("ETF Module coming soon.")
+        if st.button("RUN ETF MAPPER"): run_logic_script("etf_mapper.py")
     with c5:
         st.subheader("5. ALLOCATE")
         if st.button("GENERATE ORDERS"): run_logic_script("orders.py")
 
     st.markdown("---")
     
-    # OUTPUT VIEWER (Restored 4 Tabs)
+    # OUTPUT VIEWER
     tab_val, tab_tech, tab_etf, tab_ord = st.tabs(["💎 VALUATION REPORT", "📈 TECHNICAL SIGNALS", "🛡 ETF STRATEGY", "🛒 BUY ORDERS"])
     
     with tab_val:
@@ -194,10 +194,37 @@ if mode == "1. DAILY ACTION (Alpha)":
             st.info("No Technical Signals. Run Step 3.")
 
     with tab_etf:
-        st.info("ETF Hedging Module is under construction.")
+        df_etf = load_data("SELECT * FROM etf_hedges ORDER BY weight DESC")
+        if not df_etf.empty:
+            st.subheader("Sector Exposure Analysis")
+            c_etf1, c_etf2 = st.columns([2, 1])
+            with c_etf1:
+                st.dataframe(
+                    df_etf.style.format({"weight": "{:.1%}"}).background_gradient(subset=['weight'], cmap="Reds"),
+                    use_container_width=True
+                )
+            with c_etf2:
+                # Simple Plotly Pie Chart
+                fig = go.Figure(data=[go.Pie(labels=df_etf['sector'], values=df_etf['weight'], hole=.4)])
+                fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=250)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No ETF Data. Run 'RUN ETF MAPPER'.")
 
     with tab_ord:
-        st.info("Order Generation logic pending final DB migration.")
+        df_ord = load_data("SELECT * FROM alpha_orders")
+        if not df_ord.empty:
+            st.success(f"Generated {len(df_ord)} Buy Orders.")
+            st.dataframe(
+                df_ord.style.format({"Limit_Price": "${:.2f}", "Est_Value": "${:,.2f}"}),
+                use_container_width=True
+            )
+            
+            # Download Button
+            csv = df_ord.to_csv(index=False).encode('utf-8')
+            st.download_button("⬇️ Download Order File (CSV)", csv, "basket_orders.csv", "text/csv")
+        else:
+            st.info("No Orders Generated. Run 'GENERATE ORDERS'.")
 
 # ==============================================================================
 # MODE 2: RESEARCH LAB (Deep Dive)
