@@ -177,7 +177,7 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
         else:
             st.info("No active signals.")
 
-    with t3:
+   with t3:
         tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")
         if not tickers.empty:
             sel = st.selectbox("Select Ticker", tickers['ticker'])
@@ -185,13 +185,25 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
                 df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{sel}' ORDER BY date")
                 df_f = load_data(f"SELECT * FROM fundamentals WHERE ticker = '{sel}'")
                 
+                # --- SAFE METRICS RENDERER ---
                 if not df_f.empty:
                     d = df_f.iloc[0]
+                    
+                    # Helper to convert None -> 0.0 safely
+                    def safe_num(val):
+                        if val is None or pd.isna(val): return 0.0
+                        return float(val)
+
+                    pe = safe_num(d.get('pe_ratio'))
+                    margin = safe_num(d.get('profit_margin'))
+                    peg = safe_num(d.get('peg_ratio'))
+                    mkt_cap = safe_num(d.get('market_cap'))
+
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("P/E", f"{d.get('pe_ratio',0):.2f}")
-                    m2.metric("Margin", f"{d.get('profit_margin',0)*100:.1f}%")
-                    m3.metric("PEG", f"{d.get('peg_ratio',0):.2f}")
-                    m4.metric("Mkt Cap", f"${d.get('market_cap',0)/1e9:.1f}B")
+                    m1.metric("P/E Ratio", f"{pe:.2f}")
+                    m2.metric("Profit Margin", f"{margin * 100:.1f}%")
+                    m3.metric("PEG Ratio", f"{peg:.2f}")
+                    m4.metric("Market Cap", f"${mkt_cap / 1e9:.1f}B")
                 
                 if not df_p.empty:
                     fig = go.Figure()
