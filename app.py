@@ -265,35 +265,53 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
         else: st.warning("No Rankings. Run Multi-Factor Scoring.")
 
     with t2:
-        show_all = st.checkbox("Show Neutral Signals", value=False)
-        query = "SELECT * FROM technical_signals" if show_all else "SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT'"
-        df_tech = load_data(query + " ORDER BY \"Score\" DESC")
-        if not df_tech.empty: st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True, height=600)
-        else: st.info("No active signals.")
-
-    with t3:
-        tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")
-        if not tickers.empty:
-            sel = st.selectbox("Select Ticker", tickers['ticker'])
-            if sel:
-                df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{sel}' ORDER BY date")
-                df_f = load_data(f"SELECT * FROM fundamentals WHERE ticker = '{sel}'")
-                
-                if not df_f.empty:
-                    d = df_f.iloc[0]
-                    def safe_num(val): return float(val) if val and pd.notna(val) else 0.0
-                    m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("P/E Ratio", f"{safe_num(d.get('pe_ratio')):.2f}")
-                    m2.metric("Profit Margin", f"{safe_num(d.get('profit_margin'))*100:.1f}%")
-                    m3.metric("PEG Ratio", f"{safe_num(d.get('peg_ratio')):.2f}")
-                    m4.metric("Market Cap", f"${safe_num(d.get('market_cap'))/1e9:.1f}B")
-                
-                if not df_p.empty:
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Close', line=dict(color='#00FF00')))
-                    fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=30, b=0))
-                    st.plotly_chart(fig, use_container_width=True)
-        else: st.warning("No Data. Go to System Admin.")
+        render_guide("technicals")
+        
+        # Load Data (Sorted by Score)
+        df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"Score\" DESC")
+        
+        if not df_tech.empty:
+            st.markdown("### 🎯 Sniper Checklist (The Trinity)")
+            
+            # --- BUILD TABLE ---
+            df_display = pd.DataFrame()
+            df_display['Ticker'] = df_tech['ticker']
+            df_display['Price'] = df_tech['price'].apply(lambda x: f"${x:.2f}")
+            df_display['Score'] = df_tech['Score']
+            df_display['Signal'] = df_tech['Signal']
+            
+            # 1. THE TREND (With 200 SMA Value)
+            # Logic: If price > sma, BULL. Show the SMA level in parens.
+            df_display['🌊 Trend'] = df_tech.apply(
+                lambda x: f"✅ BULL (${x['trend_200_sma']:.2f})" if x['trend_pass'] 
+                else f"❌ BEAR (${x['trend_200_sma']:.2f})", 
+                axis=1
+            )
+            
+            # 2. THE ZONE (With RSI Value)
+            # Logic: If RSI < 35, CHEAP. Show RSI value.
+            df_display['📉 Zone'] = df_tech.apply(
+                lambda x: f"✅ LOW ({x['rsi']})" if x['rsi'] < 35 
+                else f"⚠️ ({x['rsi']})", 
+                axis=1
+            )
+            
+            # 3. THE TRIGGER (With Pattern Name)
+            # Logic: If not 'None', show the pattern name.
+            df_display['🕯️ Trigger'] = df_tech['trigger_type'].apply(
+                lambda x: f"✅ {x}" if x != "None" else "❌ Wait"
+            )
+            
+            # --- RENDER ---
+            st.dataframe(
+                df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn", vmin=0, vmax=100)
+                .map(lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG' in str(x) else 
+                             ('color: #FFA500' if 'RISKY' in str(x) else ''), subset=['Signal']),
+                use_container_width=True,
+                height=600
+            )
+        else:
+            st.info("No active signals found.")
 
 # ==============================================================================
 # MODE 3: SYSTEM ADMIN
