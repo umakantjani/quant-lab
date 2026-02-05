@@ -333,6 +333,50 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
             )
         else:
             st.info("No data. Run 'RUN TECHNICAL SNIPER'.")
+    with t3:
+        # Import the new AI Engine locally to avoid top-level crashes if file is missing
+        try:
+            from logic.report_engine import generate_ai_report
+        except ImportError:
+            st.error("Report Engine not found. Please create 'logic/report_engine.py'.")
+
+        st.markdown("### 🧬 MOLECULAR INSPECTOR (Gemini AI)")
+        
+        # 1. SELECTION CONTROLS
+        c_sel1, c_sel2 = st.columns([1, 3])
+        with c_sel1:
+            # Load tickers but allow custom entry
+            db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist() if not load_data("SELECT DISTINCT ticker FROM prices").empty else ["AAPL", "MSFT", "TSLA"]
+            ticker_input = st.selectbox("Select Ticker", db_tickers)
+        
+        with c_sel2:
+            st.write("") # Spacer
+            st.write("") 
+            # THE "MAGIC" BUTTON
+            if st.button(f"✨ ASK GEMINI: ANALYZE {ticker_input}"):
+                with st.spinner(f"Connecting to Neural Core... Analyzing {ticker_input}..."):
+                    report = generate_ai_report(ticker_input)
+                    
+                    # 2. RENDER REPORT
+                    st.markdown("---")
+                    st.markdown(report)
+                    
+                    # 3. SHOW CHART (Context)
+                    df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{ticker_input}' ORDER BY date")
+                    if not df_p.empty:
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Price', line=dict(color='#00FF00', width=2)))
+                        # Add simple annotations or style
+                        fig.update_layout(
+                            title=f"{ticker_input} Price Action",
+                            template="plotly_dark", 
+                            height=300, 
+                            margin=dict(l=0, r=0, t=30, b=0),
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+        
 
 # ==============================================================================
 # MODE 3: SYSTEM ADMIN
