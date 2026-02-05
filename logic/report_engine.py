@@ -61,21 +61,25 @@ def generate_ai_report(ticker):
         Task: Write a short, punchy Executive Summary (Buy/Sell/Wait) and 3 bullet points on the Trinity (Trend, Zone, Trigger).
         """
 
-        # 4. CALL API (Safety Mode)
+        # 4. CALL API (Next-Gen 2026 Models)
         genai.configure(api_key=API_KEY)
         
-        # We try the most basic stable model ID first
+        # We use the specific model ID found in your logs
+        # 'gemini-2.5-flash' is the perfect balance of speed and intelligence for this report.
+        model_name = 'models/gemini-2.5-flash'
+        
         try:
-            model = genai.GenerativeModel('gemini-1.0-pro')
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
             return response.text
-        except Exception as e1:
-            # Fallback to listing models to debug
+        except Exception as e:
+            # Fallback: If 2.5 fails, try the generic "latest" pointer
             try:
-                available = [m.name for m in genai.list_models()]
-                return f"❌ Connection Error. Available models: {available}. Error: {e1}"
+                model = genai.GenerativeModel('models/gemini-flash-latest')
+                response = model.generate_content(prompt)
+                return response.text
             except Exception as e2:
-                return f"❌ Critical API Error: {e1}"
+                return f"❌ Model Error: {e}"
 
     except Exception as e:
         return f"❌ System Error: {str(e)}"
