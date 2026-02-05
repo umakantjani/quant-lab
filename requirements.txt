@@ -9,3 +9,5 @@ requests
 lxml
 html5lib
 bs4
+matplotlib
+curl_cffi
