@@ -89,7 +89,7 @@ def generate_ai_report(ticker):
 
         # 4. CALL GEMINI API
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         with st.spinner("🧠 Consulting the Neural Analyst..."):
             response = model.generate_content(prompt)
