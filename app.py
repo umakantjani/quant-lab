@@ -170,11 +170,54 @@ if mode == "1. DAILY ACTION (Alpha)":
         else: st.info("No Valuation Data. Run Steps 1 & 2.")
 
     with tab_tech:
-        render_guide("technicals") # <--- INFO ADDED
-        df_tech = load_data("SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT' ORDER BY \"Score\" DESC")
+        render_guide("technicals")
+        
+        # Load the detailed data
+        df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"rsi\" ASC")
+        
         if not df_tech.empty:
-             st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True)
-        else: st.info("No Technical Signals. Run Step 3.")
+            st.markdown("### 🎯 Sniper Checklist (The Trinity)")
+            
+            # Formatting for the UI
+            def format_trend(pass_fail):
+                return "✅ BULL (>200)" if pass_fail else "❌ BEAR (<200)"
+                
+            def format_zone(rsi_val):
+                return f"✅ CHEAP ({rsi_val})" if rsi_val < 35 else f"⚠️ HIGH ({rsi_val})"
+                
+            def format_trigger(trig_type):
+                return f"✅ {trig_type}" if trig_type != "None" else "❌ Waiting"
+
+            # Create a Display View (Checklist)
+            df_display = pd.DataFrame()
+            df_display['Ticker'] = df_tech['ticker']
+            df_display['Price'] = df_tech['price'].apply(lambda x: f"${x:.2f}")
+            
+            # 1. The Tide
+            df_display['🌊 Trend (200 SMA)'] = df_tech['trend_pass'].apply(format_trend)
+            
+            # 2. The Zone
+            df_display['📉 Zone (RSI)'] = df_tech['rsi'].apply(format_zone)
+            
+            # 3. The Trigger
+            df_display['🕯️ Trigger'] = df_tech['trigger_type'].apply(format_trigger)
+            
+            # 4. Final Call
+            df_display['SIGNAL'] = df_tech['Signal']
+            
+            # Render Styled Table
+            st.dataframe(
+                df_display.style.map(
+                    lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG BUY' in str(x) else 
+                             ('color: #FFA500' if 'RISKY' in str(x) else 
+                             ('color: #FFFF00' if 'WATCH' in str(x) else '')), 
+                    subset=['SIGNAL']
+                ),
+                use_container_width=True,
+                height=600
+            )
+        else:
+            st.info("No active signals found. The market is quiet.")
 
     with tab_etf:
         render_guide("etf") # <--- INFO ADDED
