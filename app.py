@@ -177,7 +177,7 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
         else:
             st.info("No active signals.")
 
-   with t3:
+    with t3:
         tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")
         if not tickers.empty:
             sel = st.selectbox("Select Ticker", tickers['ticker'])
