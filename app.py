@@ -11,61 +11,29 @@ from logic.db_config import get_engine
 st.set_page_config(page_title="QuantValue Terminal (Gold)", layout="wide", initial_sidebar_state="expanded")
 LOGIC_DIR = "logic"
 
-# --- JONY IVE AESTHETIC (CSS INJECTION) ---
+# --- JONY IVE AESTHETIC (CSS) ---
 st.markdown("""
 <style>
-    /* 1. IMPORT FONTS */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Crimson+Pro:wght@400;600&display=swap');
-
-    /* 2. GLOBAL RESET */
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        color: #E0E0E0; /* Soft White */
-    }
-
-    /* 3. TYPOGRAPHY HIERARCHY */
-    h1, h2, h3 {
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
-        letter-spacing: -0.5px;
+    
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #E0E0E0; }
+    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: -0.5px; }
+    p, div, li { font-family: 'Crimson Pro', serif; font-size: 1.05rem; color: #B0B0B0; }
+    
+    .stDataFrame, .stTable, div[data-testid="stMetricValue"] { 
+        font-family: 'JetBrains Mono', monospace !important; font-size: 0.95rem; 
     }
     
-    p, div {
-        font-family: 'Crimson Pro', serif;
-        font-size: 1.1rem;
-        color: #B0B0B0; /* Muted Grey for text */
-    }
-
-    /* 4. DATA TABLES & METRICS (The "Apple" Look) */
-    .stDataFrame, .stTable, div[data-testid="stMetricValue"] {
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 0.95rem;
-    }
-
-    /* 5. BUTTONS (Minimalist Pills) */
     div.stButton > button {
-        border-radius: 20px;
-        border: 1px solid #404040;
-        background-color: transparent;
-        color: #E0E0E0;
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
-        transition: all 0.2s ease;
+        border-radius: 20px; border: 1px solid #404040; background-color: transparent;
+        color: #E0E0E0; font-family: 'Inter', sans-serif; font-weight: 600; transition: all 0.2s ease;
     }
     div.stButton > button:hover {
-        border-color: #00FF00; /* Signal Green */
-        color: #00FF00;
-        background-color: rgba(0, 255, 0, 0.05);
+        border-color: #00FF00; color: #00FF00; background-color: rgba(0, 255, 0, 0.05);
     }
-    div.stButton > button:active {
-        transform: scale(0.98);
-    }
-
-    /* 6. CONTAINERS (Subtle Cards) */
+    
     div[data-testid="stExpander"] {
-        border: 1px solid #303030;
-        border-radius: 8px;
-        background-color: #0e1117;
+        border: 1px solid #303030; border-radius: 6px; background-color: #0e1117;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -73,15 +41,60 @@ st.markdown("""
 # --- DATABASE CONNECTION ---
 @st.cache_resource
 def get_db_connection():
-    try:
-        return get_engine()
-    except Exception as e:
-        st.error(f"❌ DATABASE CONNECTION FAILED: {e}")
-        return None
+    try: return get_engine()
+    except Exception as e: return None
 
 engine = get_db_connection()
 
-# --- HELPER FUNCTIONS ---
+# --- HELPER: DOCUMENTATION ENGINE ---
+def render_guide(topic):
+    """Renders the context-aware help section."""
+    if topic == "valuation":
+        with st.expander("📘 GUIDE: How to read the Valuation Report"):
+            st.markdown("""
+            **The Philosophy:** This module calculates the *Intrinsic Value* of a business using a **Discounted Cash Flow (DCF)** model, specifically adapted from Aswath Damodaran's methodology.
+            
+            * **Intrinsic Value:** The 'True' worth of the stock based on its ability to generate cash in the future, discounted back to today.
+            * **Upside %:** The gap between Price and Value. `(Value - Price) / Price`. Look for > 15%.
+            * **WACC (Risk):** The "Hurdle Rate." A higher WACC means the company is riskier (high debt or volatility). We use a *Synthetic* WACC based on their interest coverage ratio.
+            * **Action:** If `Upside > 15%` and the company is not in distress (Rating > B), it is a **Buy Candidate**.
+            """)
+            
+    elif topic == "technicals":
+        with st.expander("📘 GUIDE: How to interpret Technical Signals"):
+            st.markdown("""
+            **The Philosophy:** While Valuation tells us *what* to buy, Technicals tell us *when* to buy. We use a "Sniper" approach to find oversold entries in uptrends.
+            
+            * **RSI (Relative Strength Index):**
+                * `< 30`: **Oversold** (Panic selling). Often a good entry point.
+                * `> 70`: **Overbought** (Euphoria). Careful buying here.
+            * **Bollinger Bands:** If price touches the **Lower Band**, it statistically reverts to the mean (bounces up).
+            * **Signal Decoder:**
+                * 🟢 **STRONG BUY:** Asset is deeply undervalued (RSI < 30) + showing reversal signs (Hammer candle).
+                * 🟡 **WAIT:** Asset is in "No Man's Land." No statistical edge.
+            """)
+
+    elif topic == "etf":
+        with st.expander("📘 GUIDE: Portfolio Risk & Hedging"):
+            st.markdown("""
+            **The Philosophy:** Concentration builds wealth, but diversification stays wealthy. This module analyzes your specific "Buy List" to find hidden sector risks.
+            
+            * **Sector Weight:** If your picks are >30% concentrated in one sector (e.g., Tech), you are exposed to a sector crash.
+            * **The Hedge:** The system maps your exposure to the correct inverse ETF or liquid Sector ETF (e.g., `XLK` for Tech).
+            * **Action:** If Tech exposure is 60%, consider buying Puts on `XLK` to protect the downside while keeping your stock upside.
+            """)
+
+    elif topic == "orders":
+        with st.expander("📘 GUIDE: Execution & Sizing"):
+            st.markdown("""
+            **The Philosophy:** Discipline over emotion. This engine allocates capital mathematically to prevent "betting the farm" on one stock.
+            
+            * **Position Sizing:** The system allocates equal weight (e.g., $10k) to the Top 10 highest-conviction ideas.
+            * **Limit Price:** We strictly use **Limit Orders** at the current price to avoid slippage.
+            * **Action:** Download the CSV. It is formatted for direct upload to interactive brokers or for your manual blotter.
+            """)
+
+# --- HELPER: SCRIPT RUNNER ---
 def run_logic_script(script_name):
     script_path = os.path.join(LOGIC_DIR, script_name)
     if not os.path.exists(script_path):
@@ -91,143 +104,102 @@ def run_logic_script(script_name):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.getcwd()
     
-    # UI: Create a "Live Terminal" output box
     st.write(f"🚀 **Initializing {script_name}...**")
     terminal_placeholder = st.empty()
     logs = []
     
-    # STREAMING EXECUTION (The Fix for Real-Time Feedback)
     process = subprocess.Popen(
-        [sys.executable, script_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, 
-        text=True,
-        env=env,
-        bufsize=1 
+        [sys.executable, script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+        text=True, env=env, bufsize=1
     )
     
-    # Read output line by line
     while True:
         line = process.stdout.readline()
-        if not line and process.poll() is not None:
-            break
+        if not line and process.poll() is not None: break
         if line:
             logs.append(line)
-            # Update the UI container with the latest 15 lines
             terminal_placeholder.code("".join(logs[-15:]), language="bash")
             
-    if process.returncode == 0:
-        st.success(f"✅ {script_name} Complete.")
-    else:
-        st.error(f"❌ {script_name} Failed.")
+    if process.returncode == 0: st.success(f"✅ {script_name} Complete.")
+    else: st.error(f"❌ {script_name} Failed.")
 
 def load_data(query):
     if engine is None: return pd.DataFrame()
-    try:
-        return pd.read_sql(query, engine)
-    except Exception as e:
-        return pd.DataFrame()
+    try: return pd.read_sql(query, engine)
+    except: return pd.DataFrame()
 
 # --- SIDEBAR ---
 st.sidebar.title("QUANT LAB [GOLD]")
 st.sidebar.markdown("---")
-mode = st.sidebar.radio("WORKFLOW", [
-    "1. DAILY ACTION (Alpha)", 
-    "2. RESEARCH LAB (Deep Dive)", 
-    "3. SYSTEM ADMIN (Cloud)"
-])
+mode = st.sidebar.radio("WORKFLOW", ["1. DAILY ACTION (Alpha)", "2. RESEARCH LAB (Deep Dive)", "3. SYSTEM ADMIN (Cloud)"])
 
 # ==============================================================================
-# MODE 1: DAILY ALPHA (Restored & Upgraded)
+# MODE 1: DAILY ALPHA
 # ==============================================================================
 if mode == "1. DAILY ACTION (Alpha)":
     st.title("⚡ DAILY ALPHA GENERATOR")
     st.markdown("Generate today's buy list based on **Deep Value (Damodaran)** and **Price Momentum**.")
     
-    # 5-STEP PIPELINE CONTROLS
     c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
+    with c1: 
         st.subheader("1. SCAN")
         if st.button("RUN SCANNER"): run_logic_script("scanner.py")
-    with c2:
+    with c2: 
         st.subheader("2. VALUE")
         if st.button("RUN VALUATION"): run_logic_script("valuation.py")
-    with c3:
+    with c3: 
         st.subheader("3. CHARTS")
         if st.button("RUN TECHNICALS"): run_logic_script("technical_models.py")
-    with c4:
+    with c4: 
         st.subheader("4. HEDGE")
         if st.button("RUN ETF MAPPER"): run_logic_script("etf_mapper.py")
-    with c5:
+    with c5: 
         st.subheader("5. ALLOCATE")
         if st.button("GENERATE ORDERS"): run_logic_script("orders.py")
 
     st.markdown("---")
     
-    # OUTPUT VIEWER
     tab_val, tab_tech, tab_etf, tab_ord = st.tabs(["💎 VALUATION REPORT", "📈 TECHNICAL SIGNALS", "🛡 ETF STRATEGY", "🛒 BUY ORDERS"])
     
     with tab_val:
+        render_guide("valuation") # <--- INFO ADDED
         df = load_data("SELECT * FROM alpha_valuation ORDER BY upside_pct DESC")
         if not df.empty:
             st.metric("Undervalued Opportunities", len(df))
-            st.dataframe(
-                df.style.format({
-                    "current_price": "${:.2f}", 
-                    "intrinsic_value": "${:.2f}", 
-                    "upside_pct": "{:.1f}%",
-                    "wacc_pct": "{:.1f}%"
-                }).background_gradient(subset=['upside_pct'], cmap="Greens"),
-                use_container_width=True, height=500
-            )
-        else:
-            st.info("No Valuation Data. Run Steps 1 & 2.")
+            st.dataframe(df.style.format({"current_price": "${:.2f}", "intrinsic_value": "${:.2f}", "upside_pct": "{:.1f}%", "wacc_pct": "{:.1f}%"}).background_gradient(subset=['upside_pct'], cmap="Greens"), use_container_width=True, height=500)
+        else: st.info("No Valuation Data. Run Steps 1 & 2.")
 
     with tab_tech:
+        render_guide("technicals") # <--- INFO ADDED
         df_tech = load_data("SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT' ORDER BY \"Score\" DESC")
         if not df_tech.empty:
-             st.dataframe(
-                df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']),
-                use_container_width=True
-            )
-        else:
-            st.info("No Technical Signals. Run Step 3.")
+             st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True)
+        else: st.info("No Technical Signals. Run Step 3.")
 
     with tab_etf:
+        render_guide("etf") # <--- INFO ADDED
         df_etf = load_data("SELECT * FROM etf_hedges ORDER BY weight DESC")
         if not df_etf.empty:
-            st.subheader("Sector Exposure Analysis")
-            c_etf1, c_etf2 = st.columns([2, 1])
-            with c_etf1:
-                st.dataframe(
-                    df_etf.style.format({"weight": "{:.1%}"}).background_gradient(subset=['weight'], cmap="Reds"),
-                    use_container_width=True
-                )
-            with c_etf2:
-                # Simple Plotly Pie Chart
+            c1, c2 = st.columns([2, 1])
+            with c1: st.dataframe(df_etf.style.format({"weight": "{:.1%}"}).background_gradient(subset=['weight'], cmap="Reds"), use_container_width=True)
+            with c2: 
                 fig = go.Figure(data=[go.Pie(labels=df_etf['sector'], values=df_etf['weight'], hole=.4)])
-                fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=250)
+                fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250)
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No ETF Data. Run 'RUN ETF MAPPER'.")
+        else: st.info("No ETF Data. Run 'RUN ETF MAPPER'.")
 
     with tab_ord:
+        render_guide("orders") # <--- INFO ADDED
         df_ord = load_data("SELECT * FROM alpha_orders")
         if not df_ord.empty:
             st.success(f"Generated {len(df_ord)} Buy Orders.")
-            st.dataframe(
-                df_ord.style.format({"Limit_Price": "${:.2f}", "Est_Value": "${:,.2f}"}),
-                use_container_width=True
-            )
-            
-            # Download Button
+            st.dataframe(df_ord.style.format({"Limit_Price": "${:.2f}", "Est_Value": "${:,.2f}"}), use_container_width=True)
             csv = df_ord.to_csv(index=False).encode('utf-8')
             st.download_button("⬇️ Download Order File (CSV)", csv, "basket_orders.csv", "text/csv")
-        else:
-            st.info("No Orders Generated. Run 'GENERATE ORDERS'.")
+        else: st.info("No Orders Generated. Run 'GENERATE ORDERS'.")
 
 # ==============================================================================
-# MODE 2: RESEARCH LAB (Deep Dive)
+# MODE 2: RESEARCH LAB
 # ==============================================================================
 elif mode == "2. RESEARCH LAB (Deep Dive)":
     st.title("🔬 QUANTITATIVE RESEARCH LAB")
@@ -246,22 +218,15 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
     
     with t1:
         df_rank = load_data("SELECT * FROM quant_rankings ORDER BY \"TOTAL_SCORE\" DESC")
-        if not df_rank.empty:
-            st.dataframe(df_rank.style.background_gradient(subset=['TOTAL_SCORE'], cmap="RdYlGn"), use_container_width=True, height=600)
-        else:
-            st.warning("No Rankings. Run Multi-Factor Scoring.")
+        if not df_rank.empty: st.dataframe(df_rank.style.background_gradient(subset=['TOTAL_SCORE'], cmap="RdYlGn"), use_container_width=True, height=600)
+        else: st.warning("No Rankings. Run Multi-Factor Scoring.")
 
     with t2:
         show_all = st.checkbox("Show Neutral Signals", value=False)
         query = "SELECT * FROM technical_signals" if show_all else "SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT'"
         df_tech = load_data(query + " ORDER BY \"Score\" DESC")
-        if not df_tech.empty:
-            st.dataframe(
-                df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']),
-                use_container_width=True, height=600
-            )
-        else:
-            st.info("No active signals.")
+        if not df_tech.empty: st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True, height=600)
+        else: st.info("No active signals.")
 
     with t3:
         tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")
@@ -271,35 +236,24 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
                 df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{sel}' ORDER BY date")
                 df_f = load_data(f"SELECT * FROM fundamentals WHERE ticker = '{sel}'")
                 
-                # --- SAFE METRICS RENDERER (Crash Proof) ---
                 if not df_f.empty:
                     d = df_f.iloc[0]
-                    
-                    def safe_num(val):
-                        if val is None or pd.isna(val): return 0.0
-                        return float(val)
-
-                    pe = safe_num(d.get('pe_ratio'))
-                    margin = safe_num(d.get('profit_margin'))
-                    peg = safe_num(d.get('peg_ratio'))
-                    mkt_cap = safe_num(d.get('market_cap'))
-
+                    def safe_num(val): return float(val) if val and pd.notna(val) else 0.0
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("P/E Ratio", f"{pe:.2f}")
-                    m2.metric("Profit Margin", f"{margin * 100:.1f}%")
-                    m3.metric("PEG Ratio", f"{peg:.2f}")
-                    m4.metric("Market Cap", f"${mkt_cap / 1e9:.1f}B")
+                    m1.metric("P/E Ratio", f"{safe_num(d.get('pe_ratio')):.2f}")
+                    m2.metric("Profit Margin", f"{safe_num(d.get('profit_margin'))*100:.1f}%")
+                    m3.metric("PEG Ratio", f"{safe_num(d.get('peg_ratio')):.2f}")
+                    m4.metric("Market Cap", f"${safe_num(d.get('market_cap'))/1e9:.1f}B")
                 
                 if not df_p.empty:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Close', line=dict(color='#00FF00')))
                     fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=30, b=0))
                     st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("No Data. Go to System Admin.")
+        else: st.warning("No Data. Go to System Admin.")
 
 # ==============================================================================
-# MODE 3: SYSTEM ADMIN (Cloud)
+# MODE 3: SYSTEM ADMIN
 # ==============================================================================
 elif mode == "3. SYSTEM ADMIN (Cloud)":
     st.title("🛠 SYSTEM ADMINISTRATION")
