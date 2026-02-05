@@ -7,6 +7,9 @@ import time
 import plotly.graph_objects as go
 from sqlalchemy import text
 from logic.db_config import get_engine
+from fpdf import FPDF
+from docx import Document
+from io import BytesIO
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="QuantValue Terminal (Gold)", layout="wide", initial_sidebar_state="expanded")
@@ -37,7 +40,6 @@ st.markdown("""
         border: 1px solid #303030; border-radius: 6px; background-color: #0e1117;
     }
     
-    /* Status Container Styling */
     div[data-testid="stStatusWidget"] {
         border: 1px solid #00FF00; background-color: #051a05;
     }
@@ -52,69 +54,47 @@ def get_db_connection():
 
 engine = get_db_connection()
 
+# --- HELPER: EXPORT ENGINE (PDF/DOCX) ---
+def create_pdf(text_content, ticker):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    # Basic cleanup for latin-1 encoding
+    clean_text = text_content.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 10, clean_text)
+    
+    buffer = BytesIO()
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    buffer.write(pdf_output)
+    return buffer
+
+def create_docx(text_content, ticker):
+    doc = Document()
+    doc.add_heading(f'Investment Report: {ticker}', 0)
+    for line in text_content.split('\n'):
+        doc.add_paragraph(line)
+    
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 # --- HELPER: DOCUMENTATION ENGINE ---
 def render_guide(topic):
-    """Renders the context-aware help section."""
     if topic == "valuation":
         with st.expander("📘 GUIDE: How to read the Valuation Report"):
             st.markdown("""
-            **The Philosophy:** This module calculates the *Intrinsic Value* of a business using a **Discounted Cash Flow (DCF)** model, specifically adapted from Aswath Damodaran's methodology.
-            
-            * **Intrinsic Value:** The 'True' worth of the stock based on its ability to generate cash in the future, discounted back to today.
-            * **Upside %:** The gap between Price and Value. `(Value - Price) / Price`. Look for > 15%.
-            * **WACC (Risk):** The "Hurdle Rate." A higher WACC means the company is riskier (high debt or volatility). We use a *Synthetic* WACC based on their interest coverage ratio.
-            * **Action:** If `Upside > 15%` and the company is not in distress (Rating > B), it is a **Buy Candidate**.
-            """)
-            
+            **The Philosophy:** This module calculates the *Intrinsic Value* of a business using a **Discounted Cash Flow (DCF)** model.
+            * **Upside %:** The gap between Price and Value. Look for > 15%.
+            * **WACC (Risk):** The "Hurdle Rate." Higher = Riskier.
+            """)     
     elif topic == "technicals":
-        with st.expander("📘 GUIDE: The Sniper's Trinity (Rules of Engagement)"):
+        with st.expander("📘 GUIDE: The Sniper's Trinity"):
             st.markdown("""
-            **The Philosophy:** We do not guess bottoms. We wait for three specific conditions to align. If any answer is "No", there is no trade.
-            
-            ### **1. The Tide (The Trend)**
-            * **Question:** Is the tide coming in or going out?
-            * **The Rule:** Check the **200-Day SMA**.
-            * **Pass:** Price > 200 SMA. (Secular Bull Market).
-            * **Fail:** Price < 200 SMA. (Bear Market). *Warning: Buying here is catching a falling knife.*
-            
-            ### **2. The Zone (The Setup)**
-            * **Question:** Is the price unfairly cheap right now?
-            * **The Rule:** Check **RSI (14)** and **Bollinger Bands (20, 2)**.
-            * **Pass:** RSI < 30 (Oversold) OR Price touches Lower Bollinger Band.
-            * **Fail:** RSI is neutral (40-60). No statistical edge.
-            
-            ### **3. The Trigger (The Green Light)**
-            * **Question:** Did the buyers just show up?
-            * **The Rule:** Look for a **Reversal Candle** on the Daily chart.
-            * **Pass:**
-                * **Hammer:** Small body, long lower wick (Buyers rejected the lows).
-                * **Engulfing:** Big Green candle eats the previous Red candle.
-            
-            ---
-            **The Signal Decoder:**
-            * 🟢 **STRONG BUY:** All 3 Passed (Trend + Zone + Trigger).
-            * 🟡 **RISKY BUY:** Trend Failed (Below 200 SMA), but Zone & Trigger Passed. (Counter-trend trade).
-            * 🟡 **WATCH:** Zone Passed (Cheap), but no Trigger yet.
-            """)
-
-    elif topic == "etf":
-        with st.expander("📘 GUIDE: Portfolio Risk & Hedging"):
-            st.markdown("""
-            **The Philosophy:** Concentration builds wealth, but diversification stays wealthy. This module analyzes your specific "Buy List" to find hidden sector risks.
-            
-            * **Sector Weight:** If your picks are >30% concentrated in one sector (e.g., Tech), you are exposed to a sector crash.
-            * **The Hedge:** The system maps your exposure to the correct inverse ETF or liquid Sector ETF (e.g., `XLK` for Tech).
-            * **Action:** If Tech exposure is 60%, consider buying Puts on `XLK` to protect the downside while keeping your stock upside.
-            """)
-
-    elif topic == "orders":
-        with st.expander("📘 GUIDE: Execution & Sizing"):
-            st.markdown("""
-            **The Philosophy:** Discipline over emotion. This engine allocates capital mathematically to prevent "betting the farm" on one stock.
-            
-            * **Position Sizing:** The system allocates equal weight (e.g., $10k) to the Top 10 highest-conviction ideas.
-            * **Limit Price:** We strictly use **Limit Orders** at the current price to avoid slippage.
-            * **Action:** Download the CSV. It is formatted for direct upload to interactive brokers or for your manual blotter.
+            **The Philosophy:** We wait for three conditions.
+            * **1. The Tide (Trend):** Price > 200 SMA (Bullish).
+            * **2. The Zone (Setup):** RSI < 30 (Oversold).
+            * **3. The Trigger (Action):** Hammer or Engulfing Candle.
             """)
 
 # --- HELPER: SCRIPT RUNNER ---
@@ -123,26 +103,18 @@ def run_logic_script(script_name):
     if not os.path.exists(script_path):
         st.error(f"Script not found: {script_path}")
         return
-        
     env = os.environ.copy()
     env["PYTHONPATH"] = os.getcwd()
-    
     st.write(f"🚀 **Initializing {script_name}...**")
     terminal_placeholder = st.empty()
     logs = []
-    
-    process = subprocess.Popen(
-        [sys.executable, script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-        text=True, env=env, bufsize=1
-    )
-    
+    process = subprocess.Popen([sys.executable, script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env, bufsize=1)
     while True:
         line = process.stdout.readline()
         if not line and process.poll() is not None: break
         if line:
             logs.append(line)
             terminal_placeholder.code("".join(logs[-15:]), language="bash")
-            
     if process.returncode == 0: st.success(f"✅ {script_name} Complete.")
     else: st.error(f"❌ {script_name} Failed.")
 
@@ -154,11 +126,12 @@ def load_data(query):
 # --- SIDEBAR ---
 st.sidebar.title("QUANT LAB [GOLD]")
 st.sidebar.markdown("---")
+# REORDERED NAVIGATION
 mode = st.sidebar.radio("WORKFLOW", [
     "1. DAILY ACTION (Alpha)", 
     "2. RESEARCH LAB (Deep Dive)", 
-    "3. SYSTEM ADMIN (Cloud)",
-    "4. ASSET LAB REPORT (AI)" # <--- NEW TAB
+    "3. ASSET LAB REPORT (AI)",  # <--- Moved Up
+    "⚙️ SETTINGS & ADMIN"       # <--- Moved Down & Renamed
 ])
 
 # ==============================================================================
@@ -166,23 +139,18 @@ mode = st.sidebar.radio("WORKFLOW", [
 # ==============================================================================
 if mode == "1. DAILY ACTION (Alpha)":
     st.title("⚡ DAILY ALPHA GENERATOR")
-    st.markdown("Generate today's buy list based on **Deep Value (Damodaran)** and **Price Momentum**.")
+    st.markdown("Generate today's buy list based on **Deep Value** and **Price Momentum**.")
     
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1: 
-        st.subheader("1. SCAN")
         if st.button("RUN SCANNER"): run_logic_script("scanner.py")
     with c2: 
-        st.subheader("2. VALUE")
         if st.button("RUN VALUATION"): run_logic_script("valuation.py")
     with c3: 
-        st.subheader("3. CHARTS")
-        if st.button("RUN TECHNICALS"): run_logic_script("technical_models.py")
+        if st.button("RUN CHARTS"): run_logic_script("technical_models.py")
     with c4: 
-        st.subheader("4. HEDGE")
-        if st.button("RUN ETF MAPPER"): run_logic_script("etf_mapper.py")
+        if st.button("RUN HEDGE"): run_logic_script("etf_mapper.py")
     with c5: 
-        st.subheader("5. ALLOCATE")
         if st.button("GENERATE ORDERS"): run_logic_script("orders.py")
 
     st.markdown("---")
@@ -195,115 +163,72 @@ if mode == "1. DAILY ACTION (Alpha)":
         if not df.empty:
             st.metric("Undervalued Opportunities", len(df))
             st.dataframe(df.style.format({"current_price": "${:.2f}", "intrinsic_value": "${:.2f}", "upside_pct": "{:.1f}%", "wacc_pct": "{:.1f}%"}).background_gradient(subset=['upside_pct'], cmap="Greens"), use_container_width=True, height=500)
-        else: st.info("No Valuation Data. Run Steps 1 & 2.")
+        else: st.info("No Valuation Data.")
 
     with tab_tech:
         render_guide("technicals") 
         df_tech = load_data("SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT' ORDER BY \"Score\" DESC")
         if not df_tech.empty:
              st.dataframe(df_tech.style.applymap(lambda x: 'color: #00FF00' if 'BUY' in str(x) else ('color: #FF0000' if 'SELL' in str(x) else ''), subset=['Signal']), use_container_width=True)
-        else: st.info("No Technical Signals. Run Step 3.")
+        else: st.info("No Technical Signals.")
 
     with tab_etf:
-        render_guide("etf") 
         df_etf = load_data("SELECT * FROM etf_hedges ORDER BY weight DESC")
         if not df_etf.empty:
-            c1, c2 = st.columns([2, 1])
-            with c1: st.dataframe(df_etf.style.format({"weight": "{:.1%}"}).background_gradient(subset=['weight'], cmap="Reds"), use_container_width=True)
-            with c2: 
-                fig = go.Figure(data=[go.Pie(labels=df_etf['sector'], values=df_etf['weight'], hole=.4)])
-                fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250)
-                st.plotly_chart(fig, use_container_width=True)
-        else: st.info("No ETF Data. Run 'RUN ETF MAPPER'.")
+            st.dataframe(df_etf.style.format({"weight": "{:.1%}"}).background_gradient(subset=['weight'], cmap="Reds"), use_container_width=True)
 
     with tab_ord:
-        render_guide("orders") 
         df_ord = load_data("SELECT * FROM alpha_orders")
         if not df_ord.empty:
-            st.success(f"Generated {len(df_ord)} Buy Orders.")
             st.dataframe(df_ord.style.format({"Limit_Price": "${:.2f}", "Est_Value": "${:,.2f}"}), use_container_width=True)
             csv = df_ord.to_csv(index=False).encode('utf-8')
             st.download_button("⬇️ Download Order File (CSV)", csv, "basket_orders.csv", "text/csv")
-        else: st.info("No Orders Generated. Run 'GENERATE ORDERS'.")
 
 # ==============================================================================
 # MODE 2: RESEARCH LAB
 # ==============================================================================
 elif mode == "2. RESEARCH LAB (Deep Dive)":
     st.title("🔬 QUANTITATIVE RESEARCH LAB")
-    
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("### 🧠 FUNDAMENTAL MODELS")
-        if st.button("RUN MULTI-FACTOR SCORING"): run_logic_script("model_engine.py")
+        if st.button("RUN SCORING"): run_logic_script("model_engine.py")
     with c2:
-        st.markdown("### 📈 TECHNICAL MODELS")
-        if st.button("RUN TECHNICAL SNIPER"): run_logic_script("technical_models.py")
+        if st.button("RUN SNIPER"): run_logic_script("technical_models.py")
 
     st.markdown("---")
-
     t1, t2 = st.tabs(["🏆 FACTOR RANKINGS", "🎯 SNIPER SIGNALS"])
     
     with t1:
         df_rank = load_data("SELECT * FROM quant_rankings ORDER BY \"TOTAL_SCORE\" DESC")
         if not df_rank.empty: st.dataframe(df_rank.style.background_gradient(subset=['TOTAL_SCORE'], cmap="RdYlGn"), use_container_width=True, height=600)
-        else: st.warning("No Rankings. Run Multi-Factor Scoring.")
-
+    
     with t2:
         render_guide("technicals")
-        filter_mode = st.radio("Show:", ["Active Signals Only (Buy/Watch)", "Full Checklist (All Stocks)"], horizontal=True)
+        filter_mode = st.radio("Show:", ["Active Signals Only", "Full Checklist"], horizontal=True)
         df_tech = load_data("SELECT * FROM technical_signals ORDER BY \"Score\" DESC")
-        
         if not df_tech.empty:
-            if filter_mode == "Active Signals Only (Buy/Watch)":
-                df_display_source = df_tech[df_tech['Signal'] != 'WAIT']
-            else:
-                df_display_source = df_tech
-
-            st.markdown(f"### 🎯 Sniper Checklist ({len(df_display_source)} Tickers)")
+            if filter_mode == "Active Signals Only": df_display_source = df_tech[df_tech['Signal'] != 'WAIT']
+            else: df_display_source = df_tech
             
             df_display = pd.DataFrame()
             df_display['Ticker'] = df_display_source['ticker']
             df_display['Price'] = df_display_source['price'].apply(lambda x: f"${x:.2f}")
             df_display['Score'] = df_display_source['Score']
             df_display['Signal'] = df_display_source['Signal']
-            
             df_display['🌊 Trend'] = df_display_source.apply(lambda x: f"✅ BULL (${x['trend_200_sma']:.2f})" if x['trend_pass'] else f"❌ BEAR (${x['trend_200_sma']:.2f})", axis=1)
             df_display['📉 Zone'] = df_display_source.apply(lambda x: f"✅ LOW ({x['rsi']})" if x['rsi'] < 35 else f"⚠️ ({x['rsi']})", axis=1)
             df_display['🕯️ Trigger'] = df_display_source['trigger_type'].apply(lambda x: f"✅ {x}" if x != "None" else "❌ Wait")
             
-            st.dataframe(df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn", vmin=0, vmax=100).map(lambda x: 'color: #00FF00; font-weight: bold' if 'STRONG' in str(x) else ('color: #FFA500' if 'RISKY' in str(x) else ('color: #FFFF00' if 'WATCH' in str(x) else '')), subset=['Signal']), use_container_width=True, height=600)
-        else: st.info("No data. Run 'RUN TECHNICAL SNIPER'.")
+            st.dataframe(df_display.style.background_gradient(subset=['Score'], cmap="RdYlGn").map(lambda x: 'color: #00FF00' if 'STRONG' in str(x) else '', subset=['Signal']), use_container_width=True)
 
 # ==============================================================================
-# MODE 3: SYSTEM ADMIN
+# MODE 3: ASSET LAB REPORT (AI)
 # ==============================================================================
-elif mode == "3. SYSTEM ADMIN (Cloud)":
-    st.title("🛠 SYSTEM ADMINISTRATION")
-    st.warning("These actions affect the Live Database.")
-    
-    with st.expander("INIT: DATABASE SETUP (Run Once)", expanded=True):
-        c1, c2 = st.columns(2)
-        with c1: 
-            if st.button("1. RESET DATABASE TABLES"): run_logic_script("setup_db.py")
-        with c2: 
-            if st.button("2. INGEST TICKERS"): run_logic_script("ingest_tickers.py")
-            
-    with st.expander("DATA PIPELINE (Daily Update)", expanded=True):
-        if st.button("RUN FULL DATA PIPELINE"): run_logic_script("data_pipeline.py")
-            
-    with st.expander("DIAGNOSTICS"):
-        if st.button("RUN SYSTEM HEALTH CHECK"): run_logic_script("diagnose.py")
-
-# ==============================================================================
-# MODE 4: ASSET LAB REPORT (AI) - NEW SECTION
-# ==============================================================================
-elif mode == "4. ASSET LAB REPORT (AI)":
+elif mode == "3. ASSET LAB REPORT (AI)":
     st.title("🧬 ASSET LAB REPORT")
     st.markdown("Automated Institutional Research powered by **Gemini AI**.")
     st.markdown("---")
 
-    # Import locally
     try: from logic.report_engine import generate_ai_report
     except ImportError: st.error("Report Engine missing.")
 
@@ -311,53 +236,78 @@ elif mode == "4. ASSET LAB REPORT (AI)":
     
     with c1:
         st.subheader("Select Asset")
-        # Load tickers
-        db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist() if not load_data("SELECT DISTINCT ticker FROM prices").empty else ["AAPL", "MSFT", "TSLA"]
+        db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist()
+        if not db_tickers: db_tickers = ["AAPL", "MSFT", "TSLA"]
         ticker_input = st.selectbox("Ticker Symbol", db_tickers)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        generate_btn = st.button(f"✨ GENERATE REPORT FOR {ticker_input}", use_container_width=True)
+        generate_btn = st.button(f"✨ GENERATE REPORT", use_container_width=True)
         
     with c2:
         if generate_btn:
-            # --- THE FEEDBACK ANIMATION ---
             with st.status(f"🚀 Initializing Neural Analyst for {ticker_input}...", expanded=True) as status:
-                
-                st.write("📡 Connecting to Market Data Stream (Price & History)...")
-                time.sleep(1.0) # UX Pacing
-                
-                st.write("📐 Calculating Technical Trinity (Trend, Zone, Trigger)...")
-                time.sleep(0.8)
-                
-                st.write("💵 Fetching Deep Value Models (Damodaran DCF)...")
-                time.sleep(0.8)
-                
-                st.write("🧠 Synthesizing Narrative with Gemini AI...")
-                # The Actual Call
+                st.write("📡 Connecting to Market Data Stream...")
+                time.sleep(0.5)
+                st.write("📐 Calculating Technical Trinity...")
+                time.sleep(0.5)
+                st.write("🧠 Synthesizing Narrative with Gemini 2.5...")
                 report = generate_ai_report(ticker_input)
-                
-                status.update(label="✅ Report Generated Successfully", state="complete", expanded=False)
+                status.update(label="✅ Report Generated", state="complete", expanded=False)
             
             # SHOW REPORT
             st.markdown(report)
+            
+            # --- EXPORT BUTTONS ---
+            st.markdown("---")
+            st.subheader("📂 Export Report")
+            ec1, ec2, ec3 = st.columns(3)
+            
+            # 1. Word (Docx)
+            docx_file = create_docx(report, ticker_input)
+            ec1.download_button(
+                label="📄 Download Word (.docx)",
+                data=docx_file,
+                file_name=f"{ticker_input}_Investment_Memo.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            
+            # 2. PDF
+            pdf_file = create_pdf(report, ticker_input)
+            ec2.download_button(
+                label="📕 Download PDF",
+                data=pdf_file,
+                file_name=f"{ticker_input}_Investment_Memo.pdf",
+                mime="application/pdf"
+            )
+            
+            # 3. Google Docs Note
+            ec3.info("💡 **Google Docs:** Download the `.docx` file and upload it to Google Drive to edit.")
             
             # CONTEXT CHART
             df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{ticker_input}' ORDER BY date")
             if not df_p.empty:
                 st.markdown("---")
-                st.markdown(f"**{ticker_input} Price Action (1 Year)**")
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Price', line=dict(color='#00FF00', width=2)))
-                fig.update_layout(template="plotly_dark", height=300, margin=dict(l=0, r=0, t=30, b=0), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+                fig.update_layout(title=f"{ticker_input} Price Action", template="plotly_dark", height=300, margin=dict(l=0, r=0, t=30, b=0))
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            # Placeholder State
-            st.info("👈 Select a ticker and click 'Generate Report' to begin analysis.")
-            st.markdown("""
-            **What this engine does:**
-            1.  **Trend Analysis:** Checks the 200-Day SMA.
-            2.  **Momentum Check:** Analyzes RSI & Bollinger Bands.
-            3.  **Pattern Recognition:** Hunts for Hammers & Engulfing Candles.
-            4.  **Valuation Overlay:** Checks against our DCF database.
-            5.  **AI Synthesis:** Writes a Wall Street-style executive summary.
-            """)
+
+# ==============================================================================
+# MODE 4: SETTINGS & ADMIN
+# ==============================================================================
+elif mode == "⚙️ SETTINGS & ADMIN":
+    st.title("⚙️ SYSTEM SETTINGS")
+    st.warning("⚠️ Restricted Area: Database Operations")
+    
+    with st.expander("DATABASE MAINTENANCE", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1: 
+            if st.button("RESET DATABASE TABLES"): run_logic_script("setup_db.py")
+        with c2: 
+            if st.button("INGEST TICKERS"): run_logic_script("ingest_tickers.py")
+            
+    with st.expander("DATA PIPELINES"):
+        if st.button("RUN FULL DATA UPDATE"): run_logic_script("data_pipeline.py")
+            
+    with st.expander("SYSTEM DIAGNOSTICS"):
+        if st.button("RUN HEALTH CHECK"): run_logic_script("diagnose.py")
