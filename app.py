@@ -229,68 +229,88 @@ elif mode == "3. ASSET LAB REPORT (AI)":
     st.markdown("Automated Institutional Research powered by **Gemini AI**.")
     st.markdown("---")
 
-    try: from logic.report_engine import generate_ai_report
+    try: 
+        from logic.report_engine import generate_ai_report, save_report, get_report_history
     except ImportError: st.error("Report Engine missing.")
 
-    c1, c2 = st.columns([1, 2])
-    
-    with c1:
-        st.subheader("Select Asset")
-        db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist()
-        if not db_tickers: db_tickers = ["AAPL", "MSFT", "TSLA"]
-        ticker_input = st.selectbox("Ticker Symbol", db_tickers)
+    # --- SESSION STATE FOR PERSISTENCE ---
+    if "current_report" not in st.session_state: st.session_state.current_report = ""
+    if "current_ticker" not in st.session_state: st.session_state.current_ticker = ""
+
+    tab_gen, tab_hist = st.tabs(["✨ GENERATOR", "📜 ARCHIVE (Validation)"])
+
+    # --- TAB 1: GENERATOR ---
+    with tab_gen:
+        c1, c2 = st.columns([1, 3])
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        generate_btn = st.button(f"✨ GENERATE REPORT", use_container_width=True)
-        
-    with c2:
-        if generate_btn:
-            with st.status(f"🚀 Initializing Neural Analyst for {ticker_input}...", expanded=True) as status:
-                st.write("📡 Connecting to Market Data Stream...")
-                time.sleep(0.5)
-                st.write("📐 Calculating Technical Trinity...")
-                time.sleep(0.5)
-                st.write("🧠 Synthesizing Narrative with Gemini 2.5...")
-                report = generate_ai_report(ticker_input)
-                status.update(label="✅ Report Generated", state="complete", expanded=False)
+        with c1:
+            st.subheader("New Analysis")
+            db_tickers = load_data("SELECT DISTINCT ticker FROM prices ORDER BY ticker")['ticker'].tolist()
+            if not db_tickers: db_tickers = ["AAPL", "MSFT", "TSLA"]
+            ticker_input = st.selectbox("Ticker Symbol", db_tickers)
             
-            # SHOW REPORT
-            st.markdown(report)
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button(f"✨ GENERATE REPORT", use_container_width=True):
+                with st.status(f"🚀 Analyzing {ticker_input}...", expanded=True) as status:
+                    st.write("📡 Fetching Market Data...")
+                    time.sleep(0.5)
+                    st.write("🧠 Synthesizing Narrative...")
+                    report = generate_ai_report(ticker_input)
+                    st.session_state.current_report = report
+                    st.session_state.current_ticker = ticker_input
+                    status.update(label="✅ Complete", state="complete", expanded=False)
             
-            # --- EXPORT BUTTONS ---
-            st.markdown("---")
-            st.subheader("📂 Export Report")
-            ec1, ec2, ec3 = st.columns(3)
-            
-            # 1. Word (Docx)
-            docx_file = create_docx(report, ticker_input)
-            ec1.download_button(
-                label="📄 Download Word (.docx)",
-                data=docx_file,
-                file_name=f"{ticker_input}_Investment_Memo.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-            
-            # 2. PDF
-            pdf_file = create_pdf(report, ticker_input)
-            ec2.download_button(
-                label="📕 Download PDF",
-                data=pdf_file,
-                file_name=f"{ticker_input}_Investment_Memo.pdf",
-                mime="application/pdf"
-            )
-            
-            # 3. Google Docs Note
-            ec3.info("💡 **Google Docs:** Download the `.docx` file and upload it to Google Drive to edit.")
-            
-            # CONTEXT CHART
-            df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{ticker_input}' ORDER BY date")
-            if not df_p.empty:
+        with c2:
+            # Display Report if it exists in session
+            if st.session_state.current_report:
+                st.markdown(st.session_state.current_report)
                 st.markdown("---")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Price', line=dict(color='#00FF00', width=2)))
-                fig.update_layout(title=f"{ticker_input} Price Action", template="plotly_dark", height=300, margin=dict(l=0, r=0, t=30, b=0))
-                st.plotly_chart(fig, use_container_width=True)
+                
+                # --- SAVE CONTROLS ---
+                sc1, sc2 = st.columns([1, 4])
+                with sc1:
+                    if st.button("💾 SAVE TO ARCHIVE"):
+                        version = save_report(st.session_state.current_ticker, st.session_state.current_report)
+                        st.success(f"Saved to Database! (v{version})")
+                
+                # --- EXPORT CONTROLS ---
+                st.subheader("📂 Export")
+                ec1, ec2 = st.columns(2)
+                docx_file = create_docx(st.session_state.current_report, st.session_state.current_ticker)
+                ec1.download_button("📄 Download Word", docx_file, f"{st.session_state.current_ticker}_Report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                
+                pdf_file = create_pdf(st.session_state.current_report, st.session_state.current_ticker)
+                ec2.download_button("📕 Download PDF", pdf_file, f"{st.session_state.current_ticker}_Report.pdf", "application/pdf")
+
+    # --- TAB 2: ARCHIVE ---
+    with tab_hist:
+        st.subheader("📜 Research History & Validation")
+        
+        # Filter Controls
+        hist_tickers = get_report_history()['ticker'].unique().tolist()
+        if not hist_tickers:
+            st.info("No saved reports yet. Generate and Save one!")
+        else:
+            sel_hist_ticker = st.selectbox("Filter by Ticker", ["All"] + hist_tickers)
+            
+            # Fetch Data
+            df_hist = get_report_history(None if sel_hist_ticker == "All" else sel_hist_ticker)
+            
+            # Display Table
+            st.dataframe(
+                df_hist[['report_date', 'ticker', 'version', 'signal', 'created_at']],
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # View Selected Report
+            st.markdown("---")
+            st.write("### 🔍 Report Viewer")
+            report_id = st.selectbox("Select Report to View", df_hist.index, format_func=lambda x: f"{df_hist.loc[x, 'report_date']} - {df_hist.loc[x, 'ticker']} (v{df_hist.loc[x, 'version']})")
+            
+            if report_id is not None:
+                st.markdown(f"**Viewing: {df_hist.loc[report_id, 'ticker']} (v{df_hist.loc[report_id, 'version']})**")
+                st.markdown(df_hist.loc[report_id, 'content'])
 
 # ==============================================================================
 # MODE 4: SETTINGS & ADMIN
