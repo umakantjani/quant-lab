@@ -87,14 +87,27 @@ def generate_ai_report(ticker):
         Write the report now.
         """
 
-        # 4. CALL GEMINI API
+        # 4. CALL GEMINI API (ROBUST MODE)
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
         
-        with st.spinner("🧠 Consulting the Neural Analyst..."):
-            response = model.generate_content(prompt)
-            
-        return response.text
+        # List of models to try in order of preference
+        # This handles region differences and version deprecation automatically
+        models_to_try = ['gemini-1.5-flash', 'gemini-pro', 'gemini-1.5-pro-latest']
+        
+        last_error = ""
+        
+        for model_name in models_to_try:
+            try:
+                # print(f"Trying model: {model_name}...") # Debug log
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                return response.text
+            except Exception as e:
+                last_error = str(e)
+                continue # Try the next model
+        
+        # If we get here, all models failed
+        return f"❌ AI Connection Failed. Tried {models_to_try}. Last error: {last_error}"
 
     except Exception as e:
-        return f"❌ AI Error: {str(e)}"
+        return f"❌ System Error: {str(e)}"
