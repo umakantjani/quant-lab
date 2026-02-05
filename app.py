@@ -61,17 +61,34 @@ def render_guide(topic):
             """)
             
     elif topic == "technicals":
-        with st.expander("📘 GUIDE: How to interpret Technical Signals"):
+        with st.expander("📘 GUIDE: The Sniper's Trinity (Rules of Engagement)"):
             st.markdown("""
-            **The Philosophy:** While Valuation tells us *what* to buy, Technicals tell us *when* to buy. We use a "Sniper" approach to find oversold entries in uptrends.
+            **The Philosophy:** We do not guess bottoms. We wait for three specific conditions to align. If any answer is "No", there is no trade.
             
-            * **RSI (Relative Strength Index):**
-                * `< 30`: **Oversold** (Panic selling). Often a good entry point.
-                * `> 70`: **Overbought** (Euphoria). Careful buying here.
-            * **Bollinger Bands:** If price touches the **Lower Band**, it statistically reverts to the mean (bounces up).
-            * **Signal Decoder:**
-                * 🟢 **STRONG BUY:** Asset is deeply undervalued (RSI < 30) + showing reversal signs (Hammer candle).
-                * 🟡 **WAIT:** Asset is in "No Man's Land." No statistical edge.
+            ### **1. The Tide (The Trend)**
+            * **Question:** Is the tide coming in or going out?
+            * **The Rule:** Check the **200-Day SMA**.
+            * **Pass:** Price > 200 SMA. (Secular Bull Market).
+            * **Fail:** Price < 200 SMA. (Bear Market). *Warning: Buying here is catching a falling knife.*
+            
+            ### **2. The Zone (The Setup)**
+            * **Question:** Is the price unfairly cheap right now?
+            * **The Rule:** Check **RSI (14)** and **Bollinger Bands (20, 2)**.
+            * **Pass:** RSI < 30 (Oversold) OR Price touches Lower Bollinger Band.
+            * **Fail:** RSI is neutral (40-60). No statistical edge.
+            
+            ### **3. The Trigger (The Green Light)**
+            * **Question:** Did the buyers just show up?
+            * **The Rule:** Look for a **Reversal Candle** on the Daily chart.
+            * **Pass:**
+                * **Hammer:** Small body, long lower wick (Buyers rejected the lows).
+                * **Engulfing:** Big Green candle eats the previous Red candle.
+            
+            ---
+            **The Signal Decoder:**
+            * 🟢 **STRONG BUY:** All 3 Passed (Trend + Zone + Trigger).
+            * 🟡 **RISKY BUY:** Trend Failed (Below 200 SMA), but Zone & Trigger Passed. (Counter-trend trade).
+            * 🟡 **WATCH:** Zone Passed (Cheap), but no Trigger yet.
             """)
 
     elif topic == "etf":
@@ -93,7 +110,6 @@ def render_guide(topic):
             * **Limit Price:** We strictly use **Limit Orders** at the current price to avoid slippage.
             * **Action:** Download the CSV. It is formatted for direct upload to interactive brokers or for your manual blotter.
             """)
-
 # --- HELPER: SCRIPT RUNNER ---
 def run_logic_script(script_name):
     script_path = os.path.join(LOGIC_DIR, script_name)
