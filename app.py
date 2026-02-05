@@ -11,15 +11,62 @@ from logic.db_config import get_engine
 st.set_page_config(page_title="QuantValue Terminal (Gold)", layout="wide", initial_sidebar_state="expanded")
 LOGIC_DIR = "logic"
 
-# --- CUSTOM STYLING ---
+# --- JONY IVE AESTHETIC (CSS INJECTION) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Roboto Mono', monospace; }
-    .stMetric { background-color: #0e1117; padding: 10px; border-radius: 5px; border: 1px solid #303030; }
-    .stDataFrame { border: 1px solid #303030; border-radius: 5px; }
-    div.stButton > button:first-child { border: 1px solid #00FF00; color: #00FF00; background-color: transparent; }
-    div.stButton > button:first-child:hover { background-color: #00FF00; color: black; }
+    /* 1. IMPORT FONTS */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Crimson+Pro:wght@400;600&display=swap');
+
+    /* 2. GLOBAL RESET */
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        color: #E0E0E0; /* Soft White */
+    }
+
+    /* 3. TYPOGRAPHY HIERARCHY */
+    h1, h2, h3 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+    }
+    
+    p, div {
+        font-family: 'Crimson Pro', serif;
+        font-size: 1.1rem;
+        color: #B0B0B0; /* Muted Grey for text */
+    }
+
+    /* 4. DATA TABLES & METRICS (The "Apple" Look) */
+    .stDataFrame, .stTable, div[data-testid="stMetricValue"] {
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 0.95rem;
+    }
+
+    /* 5. BUTTONS (Minimalist Pills) */
+    div.stButton > button {
+        border-radius: 20px;
+        border: 1px solid #404040;
+        background-color: transparent;
+        color: #E0E0E0;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    div.stButton > button:hover {
+        border-color: #00FF00; /* Signal Green */
+        color: #00FF00;
+        background-color: rgba(0, 255, 0, 0.05);
+    }
+    div.stButton > button:active {
+        transform: scale(0.98);
+    }
+
+    /* 6. CONTAINERS (Subtle Cards) */
+    div[data-testid="stExpander"] {
+        border: 1px solid #303030;
+        border-radius: 8px;
+        background-color: #0e1117;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,21 +91,35 @@ def run_logic_script(script_name):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.getcwd()
     
-    with st.status(f"🚀 Executing {script_name}...", expanded=True) as status:
-        st.write("Initializing process...")
-        result = subprocess.run(
-            [sys.executable, script_path], 
-            capture_output=True, 
-            text=True,
-            env=env
-        )
-        if result.returncode == 0:
-            status.update(label=f"✅ Finished: {script_name}", state="complete", expanded=False)
-            with st.expander("View Logs"):
-                st.code(result.stdout)
-        else:
-            status.update(label="❌ Execution Failed", state="error")
-            st.error(result.stderr)
+    # UI: Create a "Live Terminal" output box
+    st.write(f"🚀 **Initializing {script_name}...**")
+    terminal_placeholder = st.empty()
+    logs = []
+    
+    # STREAMING EXECUTION (The Fix for Real-Time Feedback)
+    process = subprocess.Popen(
+        [sys.executable, script_path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, 
+        text=True,
+        env=env,
+        bufsize=1 
+    )
+    
+    # Read output line by line
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        if line:
+            logs.append(line)
+            # Update the UI container with the latest 15 lines
+            terminal_placeholder.code("".join(logs[-15:]), language="bash")
+            
+    if process.returncode == 0:
+        st.success(f"✅ {script_name} Complete.")
+    else:
+        st.error(f"❌ {script_name} Failed.")
 
 def load_data(query):
     if engine is None: return pd.DataFrame()
@@ -123,7 +184,6 @@ if mode == "1. DAILY ACTION (Alpha)":
             st.info("No Valuation Data. Run Steps 1 & 2.")
 
     with tab_tech:
-        # We link this to the same table as Mode 2 for consistency
         df_tech = load_data("SELECT * FROM technical_signals WHERE \"Signal\" != 'WAIT' ORDER BY \"Score\" DESC")
         if not df_tech.empty:
              st.dataframe(
@@ -137,7 +197,6 @@ if mode == "1. DAILY ACTION (Alpha)":
         st.info("ETF Hedging Module is under construction.")
 
     with tab_ord:
-        # Placeholder for order table 
         st.info("Order Generation logic pending final DB migration.")
 
 # ==============================================================================
@@ -185,11 +244,10 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
                 df_p = load_data(f"SELECT date, close FROM prices WHERE ticker = '{sel}' ORDER BY date")
                 df_f = load_data(f"SELECT * FROM fundamentals WHERE ticker = '{sel}'")
                 
-                # --- SAFE METRICS RENDERER ---
+                # --- SAFE METRICS RENDERER (Crash Proof) ---
                 if not df_f.empty:
                     d = df_f.iloc[0]
                     
-                    # Helper to convert None -> 0.0 safely
                     def safe_num(val):
                         if val is None or pd.isna(val): return 0.0
                         return float(val)
@@ -210,6 +268,8 @@ elif mode == "2. RESEARCH LAB (Deep Dive)":
                     fig.add_trace(go.Scatter(x=df_p['date'], y=df_p['close'], mode='lines', name='Close', line=dict(color='#00FF00')))
                     fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=30, b=0))
                     st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("No Data. Go to System Admin.")
 
 # ==============================================================================
 # MODE 3: SYSTEM ADMIN (Cloud)
