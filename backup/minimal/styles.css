@@ -1,0 +1,633 @@
+/* ============================================================================
+   QUANT LAB - JONY IVE INSPIRED MINIMAL DESIGN
+   "Simplicity is the ultimate sophistication"
+   Data is King. Everything else whispers.
+   ============================================================================ */
+
+/* === FONT IMPORTS === */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=SF+Mono:wght@300;400;500&display=swap');
+
+/* Fallback for SF Pro (use Inter as close alternative) */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('Inter'), local('Helvetica Neue'), local('Helvetica');
+  font-weight: 300 700;
+}
+
+/* === CSS VARIABLES - APPLE DESIGN SYSTEM === */
+:root {
+  /* Colors - Refined, Subtle, Premium */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #fafafa;
+  --color-bg-tertiary: #f5f5f7;
+  --color-bg-elevated: #ffffff;
+  
+  /* Text - Hierarchy through weight, not color */
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #86868b;
+  --color-text-tertiary: #d2d2d7;
+  
+  /* Accents - Restrained, Intentional */
+  --color-accent: #007aff;
+  --color-accent-hover: #0051d5;
+  --color-success: #34c759;
+  --color-warning: #ff9500;
+  --color-danger: #ff3b30;
+  
+  /* Borders - Barely There */
+  --color-separator: rgba(0, 0, 0, 0.04);
+  --color-separator-strong: rgba(0, 0, 0, 0.08);
+  
+  /* Shadows - Subtle, Refined */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  
+  /* Typography - San Francisco inspired */
+  --font-display: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+  
+  /* Spacing - Precise, Intentional */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+  
+  /* Border Radius - Smooth, Continuous */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  
+  /* Transitions - Silky Smooth */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+  --duration-fast: 200ms;
+  --duration-base: 300ms;
+  --duration-slow: 400ms;
+}
+
+/* === DARK MODE (Optional) === */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-primary: #000000;
+    --color-bg-secondary: #0a0a0a;
+    --color-bg-tertiary: #1c1c1e;
+    --color-bg-elevated: #1c1c1e;
+    
+    --color-text-primary: #f5f5f7;
+    --color-text-secondary: #86868b;
+    --color-text-tertiary: #3a3a3c;
+    
+    --color-separator: rgba(255, 255, 255, 0.06);
+    --color-separator-strong: rgba(255, 255, 255, 0.1);
+    
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* === BASE RESET === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1;
+}
+
+/* === STREAMLIT OVERRIDES === */
+.stApp {
+  background: var(--color-bg-primary);
+}
+
+.main .block-container {
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* === TYPOGRAPHY - MINIMAL HIERARCHY === */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  margin-bottom: var(--spacing-sm);
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+p, div, span {
+  font-family: var(--font-body);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+}
+
+/* Small text for labels */
+.label-text {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+/* Data should be prominent */
+.stDataFrame, .stTable, [data-testid="stMetricValue"] {
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+}
+
+/* === SIDEBAR - MINIMAL, REFINED === */
+[data-testid="stSidebar"] {
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-separator);
+  padding: var(--spacing-xl) 0;
+}
+
+[data-testid="stSidebar"] .css-1d391kg {
+  background: var(--color-bg-secondary);
+}
+
+/* Sidebar Title - Understated */
+[data-testid="stSidebar"] h1 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary);
+  text-align: left;
+  padding: 0 var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Sidebar Navigation - Clean Radio Buttons */
+[data-testid="stSidebar"] .stRadio {
+  background: transparent;
+  padding: 0 var(--spacing-sm);
+}
+
+[data-testid="stSidebar"] .stRadio > div {
+  gap: var(--spacing-xs);
+}
+
+[data-testid="stSidebar"] .stRadio label {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+[data-testid="stSidebar"] .stRadio label:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+[data-testid="stSidebar"] .stRadio input:checked ~ div label {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+/* === BUTTONS - SMALL, REFINED === */
+.stButton > button {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-separator-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
+  letter-spacing: -0.01em;
+}
+
+.stButton > button:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-separator-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.stButton > button:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Primary Button - Subtle Accent */
+.stButton > button[kind="primary"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+
+.stButton > button[kind="primary"]:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+/* === CARDS & CONTAINERS - BARELY THERE === */
+[data-testid="stExpander"] {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-base) var(--ease-out);
+}
+
+[data-testid="stExpander"]:hover {
+  box-shadow: var(--shadow-md);
+}
+
+[data-testid="stExpander"] summary {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+[data-testid="stExpander"] summary:hover {
+  background: var(--color-bg-tertiary);
+}
+
+/* === TABS - REFINED, MINIMAL === */
+.stTabs {
+  background: transparent;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+  gap: var(--spacing-md);
+  background: transparent;
+  padding: 0;
+  border-bottom: 1px solid var(--color-separator);
+}
+
+.stTabs [data-baseweb="tab"] {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.875rem;
+  padding: var(--spacing-md) 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-separator-strong);
+}
+
+.stTabs [aria-selected="true"] {
+  color: var(--color-accent) !important;
+  border-bottom-color: var(--color-accent) !important;
+  font-weight: 500;
+}
+
+.stTabs [data-baseweb="tab-panel"] {
+  padding-top: var(--spacing-xl);
+}
+
+/* === DATAFRAMES - DATA IS KING === */
+.stDataFrame {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Table Headers - Subtle */
+.stDataFrame thead tr th {
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 500 !important;
+  font-size: 0.75rem !important;
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  border-bottom: 1px solid var(--color-separator) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Table Rows - Clean, Spacious */
+.stDataFrame tbody tr {
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.stDataFrame tbody tr:hover {
+  background: var(--color-bg-tertiary) !important;
+}
+
+.stDataFrame tbody td {
+  padding: var(--spacing-md) !important;
+  border-bottom: 1px solid var(--color-separator) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem !important;
+}
+
+/* Remove alternating row colors */
+.stDataFrame tbody tr:nth-child(even) {
+  background: transparent !important;
+}
+
+/* === METRICS - REFINED, MINIMAL === */
+[data-testid="stMetric"] {
+  background: var(--color-bg-elevated);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-separator);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-base) var(--ease-out);
+}
+
+[data-testid="stMetric"]:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+[data-testid="stMetricLabel"] {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--spacing-xs);
+}
+
+[data-testid="stMetricValue"] {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+[data-testid="stMetricDelta"] {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* === STATUS & ALERTS === */
+[data-testid="stStatusWidget"] {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.stAlert {
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  padding: var(--spacing-md);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.stAlert[kind="info"] {
+  background: rgba(0, 122, 255, 0.06);
+  border-color: rgba(0, 122, 255, 0.2);
+  color: var(--color-accent);
+}
+
+.stAlert[kind="warning"] {
+  background: rgba(255, 149, 0, 0.06);
+  border-color: rgba(255, 149, 0, 0.2);
+  color: var(--color-warning);
+}
+
+.stAlert[kind="error"] {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: rgba(255, 59, 48, 0.2);
+  color: var(--color-danger);
+}
+
+.stAlert[kind="success"] {
+  background: rgba(52, 199, 89, 0.06);
+  border-color: rgba(52, 199, 89, 0.2);
+  color: var(--color-success);
+}
+
+/* === INPUT FIELDS - CLEAN === */
+.stTextInput input,
+.stSelectbox select,
+.stNumberInput input {
+  background: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-separator) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.875rem !important;
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  transition: all var(--duration-fast) var(--ease-out) !important;
+}
+
+.stTextInput input:focus,
+.stSelectbox select:focus,
+.stNumberInput input:focus {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  outline: none !important;
+}
+
+/* === PROGRESS BARS === */
+.stProgress > div > div {
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+/* === SCROLLBAR - MINIMAL === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-separator-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* === CODE BLOCKS === */
+.stCode {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-separator) !important;
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.8125rem !important;
+}
+
+/* === DOWNLOAD BUTTON === */
+.stDownloadButton > button {
+  background: var(--color-accent);
+  border: none;
+  color: white;
+  font-weight: 500;
+}
+
+.stDownloadButton > button:hover {
+  background: var(--color-accent-hover);
+}
+
+/* === COLUMNS === */
+[data-testid="column"] {
+  padding: 0 var(--spacing-sm);
+}
+
+/* === ANIMATIONS - SUBTLE, REFINED === */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply subtle animations */
+[data-testid="stExpander"],
+[data-testid="stMetric"],
+.stDataFrame {
+  animation: fadeIn var(--duration-base) var(--ease-out);
+}
+
+/* === UTILITY CLASSES === */
+.text-accent { color: var(--color-accent) !important; }
+.text-success { color: var(--color-success) !important; }
+.text-danger { color: var(--color-danger) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.text-secondary { color: var(--color-text-secondary) !important; }
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  h1 { font-size: 1.5rem; }
+  .main .block-container {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+  .stButton > button {
+    padding: var(--spacing-sm);
+    font-size: 0.75rem;
+  }
+}
+
+/* === CUSTOM COMPONENTS === */
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--color-separator);
+  margin: var(--spacing-xl) 0;
+}
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.badge-success {
+  background: rgba(52, 199, 89, 0.1);
+  color: var(--color-success);
+}
+
+.badge-danger {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--color-danger);
+}
+
+.badge-warning {
+  background: rgba(255, 149, 0, 0.1);
+  color: var(--color-warning);
+}
+
+.badge-neutral {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* === PRECISION & REFINEMENT === */
+
+/* Remove any excessive spacing */
+.main > div > div > div {
+  gap: var(--spacing-md) !important;
+}
+
+/* Ensure consistent line heights */
+p, span, div {
+  line-height: 1.5;
+}
+
+/* Remove any bold emphasis on data */
+.stDataFrame strong,
+.stTable strong {
+  font-weight: 400 !important;
+}
