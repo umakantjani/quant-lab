@@ -3,15 +3,20 @@ import numpy as np
 import yfinance as yf
 from sqlalchemy import create_engine, text
 from logic.db_config import get_engine
+import math
 
 # --- CONFIGURATION ---
 engine = get_engine()
 
 # ==============================================================================
-# PART 1: YOUR DAMODARAN LOGIC (Preserved)
+# PART 1: DAMODARAN LOGIC (MATH ENGINE)
 # ==============================================================================
 def calculate_synthetic_wacc(ebit, interest_expense, total_debt, market_cap, tax_rate, risk_free_rate=0.042):
     """Calculates WACC based on Damodaran's 'Synthetic Rating' methodology."""
+    # Ensure inputs are floats (handle potential None/NaN passed in)
+    ebit = float(ebit) if pd.notna(ebit) else 0.0
+    interest_expense = float(interest_expense) if pd.notna(interest_expense) else 0.0
+    
     # 1. Interest Coverage Ratio (ICR)
     if interest_expense > 0:
         icr = ebit / interest_expense
@@ -40,12 +45,12 @@ def calculate_synthetic_wacc(ebit, interest_expense, total_debt, market_cap, tax
 
     # 4. Cost of Equity (CAPM)
     equity_risk_premium = 0.05
-    beta = 1.1 # Default beta if not available
+    beta = 1.1 
     cost_of_equity = risk_free_rate + (beta * equity_risk_premium)
 
     # 5. WACC
     total_capital = market_cap + total_debt
-    if total_capital == 0: return 0.08, spread # Fallback
+    if total_capital == 0: return 0.08, spread 
     
     weight_equity = market_cap / total_capital
     weight_debt = total_debt / total_capital
@@ -54,40 +59,35 @@ def calculate_synthetic_wacc(ebit, interest_expense, total_debt, market_cap, tax
     return wacc, spread
 
 class DamodaranDCF:
-    """Your exact DCF engine, wrapped for the pipeline."""
     def __init__(self, revenue, ebit, tax_rate, wacc, cash, debt, shares, 
                  growth_high=0.12, growth_stable=0.035, terminal_year=10):
-        self.rev = revenue
-        self.ebit = ebit
-        self.tax_rate = tax_rate
-        self.wacc = wacc
-        self.cash = cash
-        self.debt = debt
-        self.shares = shares
+        self.rev = float(revenue) if pd.notna(revenue) else 0.0
+        self.ebit = float(ebit) if pd.notna(ebit) else 0.0
+        self.tax_rate = float(tax_rate) if pd.notna(tax_rate) else 0.21
+        self.wacc = float(wacc) if pd.notna(wacc) else 0.10
+        self.cash = float(cash) if pd.notna(cash) else 0.0
+        self.debt = float(debt) if pd.notna(debt) else 0.0
+        self.shares = float(shares) if pd.notna(shares) else 1.0
         self.g_high = growth_high
         self.g_stable = growth_stable
         self.n = terminal_year
         
     def calculate_value(self):
-        if self.rev <= 0 or self.shares <= 0: return 0
+        if self.rev <= 0 or self.shares <= 0: return 0.0
         
-        # Simple 2-Stage DCF approximation for speed
-        # (Expanded version of your loop logic)
         fcff_list = []
         cum_discount = 1.0
         current_rev = self.rev
         
         # Stage 1: High Growth
         for i in range(1, self.n + 1):
-            # Linearly decay growth
             g = self.g_high - ((self.g_high - self.g_stable) / self.n) * i
             current_rev *= (1 + g)
             
-            # Assume constant margin for simplicity in this version
-            margin = self.ebit / self.rev 
+            # Safe margin calc
+            margin = (self.ebit / self.rev) if self.rev else 0.10
             projected_ebit = current_rev * margin
             
-            # Reinvestment (Simplified as % of growth)
             reinvestment = (projected_ebit * (1 - self.tax_rate)) * 0.20 
             fcff = (projected_ebit * (1 - self.tax_rate)) - reinvestment
             
@@ -97,46 +97,48 @@ class DamodaranDCF:
         pv_stage_1 = sum(fcff_list)
         
         # Stage 2: Terminal Value
-        last_fcff = fcff_list[-1] * (1 + self.wacc) # Undiscount
-        terminal_val = (last_fcff * (1 + self.g_stable)) / (self.wacc - self.g_stable)
+        if not fcff_list: return 0.0
+        
+        last_fcff = fcff_list[-1] * (1 + self.wacc) 
+        denom = (self.wacc - self.g_stable)
+        if denom <= 0.001: denom = 0.05 # Prevent divide by zero/negative
+            
+        terminal_val = (last_fcff * (1 + self.g_stable)) / denom
         pv_terminal = terminal_val * cum_discount
         
-        # Equity Value
         enterprise_value = pv_stage_1 + pv_terminal
         equity_value = enterprise_value + self.cash - self.debt
         
-        return equity_value / self.shares
+        return max(0.0, equity_value / self.shares)
 
 # ==============================================================================
-# PART 2: THE PIPELINE INTEGRATION
+# PART 2: PIPELINE INTEGRATION (DATA FETCHING)
 # ==============================================================================
 def fetch_deep_data(ticker):
-    """Fetches the detailed Income Statement data needed for WACC."""
     try:
         stock = yf.Ticker(ticker)
-        # We need specific fields not in the fast .info call
         income = stock.income_stmt
-        bs = stock.balance_sheet
         
-        if income.empty or bs.empty: return None
+        if income.empty: return None
         
-        # Extract Deep Data
-        try:
-            interest_expense = abs(income.loc['Interest Expense'].iloc[0])
-        except: interest_expense = 0
-            
-        try:
-            ebit = income.loc['Operating Income'].iloc[0]
-        except: ebit = 0
-            
-        try:
-            tax_provision = income.loc['Tax Provision'].iloc[0]
-            pretax_income = income.loc['Pretax Income'].iloc[0]
-            tax_rate = tax_provision / pretax_income if pretax_income != 0 else 0.21
-        except: tax_rate = 0.21
+        # Helper to safely grab first row and force float
+        def get_first(df, name, fallback=0.0):
+            try: 
+                if name not in df.index: return fallback
+                val = df.loc[name].iloc[0]
+                if val is None or pd.isna(val): return fallback
+                return float(val)
+            except: return fallback
+
+        interest = abs(get_first(income, 'Interest Expense', 0.0))
+        ebit = get_first(income, 'Operating Income', 0.0)
+        tax = get_first(income, 'Tax Provision', 0.0)
+        pretax = get_first(income, 'Pretax Income', 0.0)
+        
+        tax_rate = tax / pretax if pretax != 0 else 0.21
             
         return {
-            'interest_expense': interest_expense,
+            'interest_expense': interest,
             'ebit_actual': ebit,
             'tax_rate_actual': abs(tax_rate)
         }
@@ -146,7 +148,6 @@ def fetch_deep_data(ticker):
 def run_valuation():
     print("🧮 RUNNING DEEP VALUE MODEL (DAMODARAN LOGIC)...")
     
-    # 1. Get Candidates (From Scanner)
     try:
         df_scan = pd.read_sql("SELECT * FROM alpha_candidates", engine)
         tickers = df_scan['ticker'].tolist()
@@ -159,7 +160,7 @@ def run_valuation():
     valuations = []
     
     for t in tickers:
-        # Get Basic Info from DB (Fast)
+        # 1. FUNDAMENTALS
         query = f"SELECT * FROM fundamentals WHERE ticker = '{t}'"
         try:
             df_fund = pd.read_sql(query, engine)
@@ -167,53 +168,75 @@ def run_valuation():
             fund = df_fund.iloc[0]
         except: continue
             
-        # Get Price from DB
+        # 2. PRICE
         try:
-            price = pd.read_sql(f"SELECT close FROM prices WHERE ticker='{t}' ORDER BY date DESC LIMIT 1", engine).iloc[0]['close']
+            price_df = pd.read_sql(f"SELECT close FROM prices WHERE ticker='{t}' ORDER BY date DESC LIMIT 1", engine)
+            if price_df.empty: continue
+            price = float(price_df.iloc[0]['close'])
         except: continue
 
-        # Get Deep Data from Yahoo (Slow but necessary for WACC)
+        # 3. DEEP DATA (Slow)
         deep_data = fetch_deep_data(t)
         if not deep_data: continue
         
-        # CALC WACC
+        # --- SAFE GET HELPER ---
+        def safe_get(key, default=0.0):
+            val = fund.get(key)
+            if val is None or pd.isna(val): return float(default)
+            return float(val)
+
+        market_cap = safe_get('market_cap')
+        
+        # 4. WACC
         wacc, spread = calculate_synthetic_wacc(
             ebit=deep_data['ebit_actual'],
             interest_expense=deep_data['interest_expense'],
-            total_debt=fund.get('market_cap', 0) * 0.2, # Approximation if total debt missing
-            market_cap=fund.get('market_cap', 0),
+            total_debt=market_cap * 0.2, 
+            market_cap=market_cap,
             tax_rate=deep_data['tax_rate_actual']
         )
         
-        # RUN DCF
+        # 5. INPUTS
+        p_to_b = safe_get('price_to_book', 1.0)
+        if p_to_b <= 0: p_to_b = 1.0
+        
+        revenue_est = market_cap / p_to_b 
+        
         dcf_engine = DamodaranDCF(
-            revenue=fund.get('market_cap', 0) / fund.get('price_to_book', 1), # Reverse engineer Rev approx if needed, or fetch
+            revenue=revenue_est,
             ebit=deep_data['ebit_actual'],
             tax_rate=deep_data['tax_rate_actual'],
             wacc=wacc,
-            cash=fund.get('free_cash_flow', 0) * 5, # Rough proxy if cash missing
+            cash=safe_get('free_cash_flow') * 5, 
             debt=0, 
-            shares=fund.get('market_cap', 0) / price
+            shares=market_cap / price if price else 0
         )
         
         intrinsic_value = dcf_engine.calculate_value()
-        upside = (intrinsic_value - price) / price
         
-        valuations.append({
-            'ticker': t,
-            'current_price': price,
-            'intrinsic_value': round(intrinsic_value, 2),
-            'upside_pct': round(upside * 100, 1),
-            'wacc_pct': round(wacc * 100, 1),
-            'synthetic_spread': round(spread * 100, 2)
-        })
-        print(f"   > {t}: Price ${price} | Value ${round(intrinsic_value, 2)} | Upside {round(upside*100)}%")
+        # --- SANITIZED OUTPUT ---
+        if price > 0 and not pd.isna(intrinsic_value) and intrinsic_value > 0:
+            upside = (intrinsic_value - price) / price
+            
+            # Rounding for Display
+            val_disp = round(intrinsic_value, 2)
+            upside_disp = round(upside * 100)
+            
+            valuations.append({
+                'ticker': t,
+                'current_price': price,
+                'intrinsic_value': val_disp,
+                'upside_pct': round(upside * 100, 1),
+                'wacc_pct': round(wacc * 100, 1),
+                'synthetic_spread': round(spread * 100, 2)
+            })
+            print(f"   > {t}: Price ${price:.2f} | Value ${val_disp} | Upside {upside_disp}%")
 
-    # Save Results
+    # 6. SAVE
     if valuations:
         df_val = pd.DataFrame(valuations)
-        # Filter: Positive Upside Only
-        df_val = df_val[df_val['upside_pct'] > 0].sort_values('upside_pct', ascending=False)
+        # Sort by Upside
+        df_val = df_val.sort_values('upside_pct', ascending=False)
         
         df_val.to_sql('alpha_valuation', engine, if_exists='replace', index=False)
         print(f"✅ VALUATION COMPLETE. Saved {len(df_val)} opportunities to DB.")
